@@ -10,6 +10,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Students = lazy(() => import('./pages/Students'))
 const Calendar = lazy(() => import('./pages/Calendar'))
 const Payments = lazy(() => import('./pages/Payments'))
+const Content = lazy(() => import('./pages/Content'))
 
 function PageFallback() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
               <Route path="/alunos" element={<Students />} />
               <Route path="/calendario" element={<Calendar />} />
               <Route path="/pagamentos" element={<Payments />} />
+              <Route path="/conteudo" element={<Content />} />
             </Route>
           </Routes>
         </Suspense>

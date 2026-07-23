@@ -6,7 +6,7 @@ App de gestão do negócio da Teacher Laís (aulas particulares, conteúdo, info
 
 ## Status do projeto
 
-Este projeto está sendo construído em fases. **Fase 1 concluída:**
+Este projeto está sendo construído em fases. **Fases 1 e 2 concluídas:**
 
 - Estrutura do app (React + Tailwind v4 + PWA instalável)
 - Autenticação (e-mail/senha ou link mágico via Supabase Auth)
@@ -14,8 +14,11 @@ Este projeto está sendo construído em fases. **Fase 1 concluída:**
 - Módulo **Alunos** (cadastro, edição, busca)
 - Módulo **Aulas/Calendário** (visão semana/mês, aulas avulsas ou recorrentes, integração com Zoom)
 - Módulo **Pagamentos** (status por aula/pacote, marcação manual, alerta de atraso, resumo do mês)
+- Módulo **Conteúdo** (quadro Kanban Ideia → Roteiro → Gravação → Edição → Publicado)
+- **Metas semanais/mensais** de conteúdo com barra de progresso e metas escalonadas (sugere aumentar a meta após 3 ciclos seguidos batidos)
+- **Relatórios periódicos** (o que foi produzido, o que faltou, próximos passos) gerados ao "fechar o ciclo" de uma meta
 
-Próximas fases: Conteúdo & Metas + Relatórios (Fase 2); Financeiro geral + limite MEI + Marketing/Infoproduto + Produção (Fase 3); Tarefas + Controle de Ponto + Gamificação + Dashboard consolidado (Fase 4).
+Próximas fases: Financeiro geral + limite MEI + Marketing/Infoproduto + Produção (Fase 3); Tarefas + Controle de Ponto + Gamificação + Dashboard consolidado (Fase 4).
 
 ## Setup
 

@@ -1,22 +1,34 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import Modal from './Modal'
 import {
   LayoutDashboard,
   Users,
   CalendarDays,
   Wallet,
   LogOut,
+  Grid2x2,
+  Clapperboard,
 } from 'lucide-react'
 
-const NAV_ITEMS = [
+const PRIMARY_ITEMS = [
   { to: '/', label: 'Início', icon: LayoutDashboard, end: true },
   { to: '/alunos', label: 'Alunos', icon: Users },
   { to: '/calendario', label: 'Aulas', icon: CalendarDays },
   { to: '/pagamentos', label: 'Pagamentos', icon: Wallet },
 ]
 
+// Seções adicionais: cabem todas no menu lateral do desktop, e no mobile
+// ficam agrupadas atrás do botão "Mais" pra não lotar a barra inferior.
+const SECONDARY_ITEMS = [{ to: '/conteudo', label: 'Conteúdo', icon: Clapperboard }]
+
 export default function Layout() {
   const { signOut } = useAuth()
+  const location = useLocation()
+  const [showMore, setShowMore] = useState(false)
+
+  const isSecondaryActive = SECONDARY_ITEMS.some((item) => location.pathname === item.to)
 
   return (
     <div className="flex h-screen flex-col bg-slate-50 md:flex-row">
@@ -27,7 +39,7 @@ export default function Layout() {
           <p className="text-xs text-slate-400">gestão do negócio</p>
         </div>
         <nav className="flex-1 space-y-1 px-3">
-          {NAV_ITEMS.map((item) => (
+          {[...PRIMARY_ITEMS, ...SECONDARY_ITEMS].map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -62,7 +74,7 @@ export default function Layout() {
 
         {/* Mobile bottom nav */}
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 flex border-t border-slate-200 bg-white md:hidden">
-          {NAV_ITEMS.map((item) => (
+          {PRIMARY_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -77,8 +89,37 @@ export default function Layout() {
               {item.label}
             </NavLink>
           ))}
+          <button
+            onClick={() => setShowMore(true)}
+            className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium ${
+              isSecondaryActive ? 'text-indigo-600' : 'text-slate-400'
+            }`}
+          >
+            <Grid2x2 className="h-5 w-5" />
+            Mais
+          </button>
         </nav>
       </div>
+
+      <Modal open={showMore} onClose={() => setShowMore(false)} title="Mais">
+        <div className="space-y-1">
+          {SECONDARY_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={() => setShowMore(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium ${
+                  isActive ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
+                }`
+              }
+            >
+              <item.icon className="h-5 w-5" />
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+      </Modal>
     </div>
   )
 }

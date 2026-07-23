@@ -4,13 +4,15 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency, formatTime, formatDate, CLASS_STATUS } from '../lib/format'
 import { differenceInCalendarDays, endOfDay, endOfWeek, startOfDay } from 'date-fns'
-import { CalendarDays, AlertCircle, Video } from 'lucide-react'
+import { CalendarDays, AlertCircle, Video, Clapperboard } from 'lucide-react'
 
 export default function Dashboard() {
   const { user } = useAuth()
   const [todayClasses, setTodayClasses] = useState([])
   const [weekClasses, setWeekClasses] = useState([])
   const [pendingPayments, setPendingPayments] = useState([])
+  const [contentGoal, setContentGoal] = useState(null)
+  const [contentProduced, setContentProduced] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,7 +22,7 @@ export default function Dashboard() {
   async function load() {
     setLoading(true)
     const now = new Date()
-    const [{ data: today }, { data: week }, { data: pending }] = await Promise.all([
+    const [{ data: today }, { data: week }, { data: pending }, { data: goals }] = await Promise.all([
       supabase
         .from('classes')
         .select('*, students(name)')
@@ -40,10 +42,28 @@ export default function Dashboard() {
         .select('*, students(name)')
         .neq('status', 'paid')
         .order('due_date', { ascending: true, nullsFirst: false }),
+      supabase
+        .from('content_goals')
+        .select('*')
+        .eq('period_type', 'week')
+        .order('period_start', { ascending: false })
+        .limit(1),
     ])
     setTodayClasses(today || [])
     setWeekClasses(week || [])
     setPendingPayments(pending || [])
+
+    const goal = goals?.[0] || null
+    setContentGoal(goal)
+    if (goal) {
+      const { count } = await supabase
+        .from('content_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'published')
+        .gte('published_date', goal.period_start)
+        .lte('published_date', goal.period_end)
+      setContentProduced(count || 0)
+    }
     setLoading(false)
   }
 
@@ -133,6 +153,34 @@ export default function Dashboard() {
                       </span>
                     </div>
                   ))}
+                </div>
+              </>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <Clapperboard className="h-4 w-4 text-violet-600" /> Meta de conteúdo da semana
+              </h2>
+              <Link to="/conteudo" className="text-xs font-medium text-indigo-600 hover:underline">
+                ver quadro
+              </Link>
+            </div>
+            {!contentGoal ? (
+              <p className="text-sm text-slate-400">Nenhuma meta definida ainda.</p>
+            ) : (
+              <>
+                <p className="text-sm text-slate-700">
+                  <span className="text-lg font-semibold text-slate-900">{contentProduced}</span> / {contentGoal.target_count} publicados
+                </p>
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full ${
+                      contentProduced >= contentGoal.target_count ? 'bg-emerald-500' : 'bg-indigo-500'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.round((contentProduced / contentGoal.target_count) * 100))}%` }}
+                  />
                 </div>
               </>
             )}

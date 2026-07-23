@@ -45,3 +45,25 @@ export const PAYMENT_STATUS = {
   pending: { label: 'Pendente', className: 'bg-amber-50 text-amber-700' },
   late: { label: 'Atrasado', className: 'bg-red-50 text-red-700' },
 }
+
+export const CONTENT_STATUS_ORDER = ['idea', 'script', 'recording', 'editing', 'published']
+
+export const CONTENT_STATUS = {
+  idea: { label: 'Ideia', className: 'bg-slate-100 text-slate-600' },
+  script: { label: 'Roteiro', className: 'bg-blue-50 text-blue-700' },
+  recording: { label: 'Gravação', className: 'bg-violet-50 text-violet-700' },
+  editing: { label: 'Edição', className: 'bg-amber-50 text-amber-700' },
+  published: { label: 'Publicado', className: 'bg-emerald-50 text-emerald-700' },
+}
+
+export const CONTENT_FORMAT = {
+  short: 'Short',
+  long: 'Longo',
+}
+
+export const CONTENT_PLATFORM = {
+  youtube: 'YouTube',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  outro: 'Outro',
+}
