@@ -10,6 +10,10 @@ import {
   LogOut,
   Grid2x2,
   Clapperboard,
+  Landmark,
+  Megaphone,
+  Film,
+  Settings as SettingsIcon,
 } from 'lucide-react'
 
 const PRIMARY_ITEMS = [
@@ -21,7 +25,13 @@ const PRIMARY_ITEMS = [
 
 // Seções adicionais: cabem todas no menu lateral do desktop, e no mobile
 // ficam agrupadas atrás do botão "Mais" pra não lotar a barra inferior.
-const SECONDARY_ITEMS = [{ to: '/conteudo', label: 'Conteúdo', icon: Clapperboard }]
+const SECONDARY_ITEMS = [
+  { to: '/conteudo', label: 'Conteúdo', icon: Clapperboard },
+  { to: '/financeiro', label: 'Financeiro', icon: Landmark },
+  { to: '/marketing', label: 'Marketing', icon: Megaphone },
+  { to: '/producao', label: 'Produção', icon: Film },
+  { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon },
+]
 
 export default function Layout() {
   const { signOut } = useAuth()
