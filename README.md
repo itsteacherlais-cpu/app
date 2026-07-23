@@ -66,7 +66,19 @@ Acesse o app publicado pelo navegador do celular e use "Adicionar à tela inicia
 
 ## Migração da planilha antiga
 
-Quando os arquivos de seed (SQL/CSV) da planilha de controle de pagamentos/gastos forem anexados, eles serão adaptados ao schema em `supabase/migrations/0001_init.sql` (tabelas `students`, `payments`, `transactions`) e disponibilizados em `supabase/seed/`.
+Os dados da planilha de controle de pagamentos/gastos (jan–jun/2026) já foram migrados para `supabase/seed/0001_seed_from_planilha.sql`, adaptados ao schema atual: 10 alunos em `students`, os pagamentos recebidos em `payments`, e as receitas/despesas do negócio em `transactions`.
+
+**Passo a passo para rodar (sem precisar saber programar):**
+
+1. Garanta que os passos 1–3 do Setup acima já foram feitos (projeto Supabase criado, migration `0001_init.sql` rodada).
+2. Crie sua conta no app pelo menos uma vez (acesse a tela de login e cadastre seu e-mail/senha) — o script identifica automaticamente o único usuário existente no Supabase Auth.
+3. No painel do Supabase, abra **SQL Editor** no menu lateral.
+4. Clique em **New query**.
+5. Abra o arquivo `supabase/seed/0001_seed_from_planilha.sql` deste repositório, copie todo o conteúdo e cole no editor.
+6. Clique em **Run**. Se aparecer "Success. No rows returned", funcionou.
+7. Pode rodar de novo sem medo — o script não duplica dados já existentes.
+
+O que **não** foi migrado (a planilha não tinha esse detalhe): horário/data de cada aula individual (cadastre as aulas daqui pra frente pelo módulo Aulas), WhatsApp/e-mail/nível/objetivo de cada aluno (edite depois pela tela de Alunos), e 2 lançamentos que estavam marcados como "pendente" na planilha (Aura YouTube de janeiro e K.Education de abril) — ficaram de fora de propósito, para você lançar manualmente quando confirmar se foram pagos ou não. Todos os detalhes estão comentados no topo do próprio arquivo `.sql`.
 
 ## Estrutura
 
