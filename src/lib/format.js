@@ -110,3 +110,13 @@ export function formatHours(minutes) {
   if (m === 0) return `${h}h`
   return `${h}h${m}min`
 }
+
+// Cronômetro ao vivo, com segundos (ex.: "1:04:32" ou "4:32")
+export function formatStopwatch(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds || 0))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  const pad = (n) => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`
+}

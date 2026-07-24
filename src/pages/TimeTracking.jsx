@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
-import { Play, Square, Clock, ListChecks } from 'lucide-react'
-import { WORK_CATEGORY, formatHours, formatDateTime } from '../lib/format'
+import { Play, Square, Clock, ListChecks, Pencil, Trash2 } from 'lucide-react'
+import { WORK_CATEGORY, formatHours, formatDateTime, formatStopwatch } from '../lib/format'
 import { getPeriodRange } from '../lib/period'
-import { differenceInMinutes, subWeeks, startOfDay, endOfDay } from 'date-fns'
+import { differenceInMinutes, differenceInSeconds, subWeeks, startOfDay, endOfDay, format } from 'date-fns'
 
 export default function TimeTracking() {
   const { user } = useAuth()
   const [activeSession, setActiveSession] = useState(null)
   const [sessions, setSessions] = useState([])
+  const [allTasks, setAllTasks] = useState([])
   const [openTasks, setOpenTasks] = useState([])
   const [doneTasksThisWeek, setDoneTasksThisWeek] = useState([])
   const [loading, setLoading] = useState(true)
@@ -18,15 +20,18 @@ export default function TimeTracking() {
   const [category, setCategory] = useState('aulas')
   const [taskId, setTaskId] = useState('')
   const [, setTick] = useState(0)
+  const [editingSession, setEditingSession] = useState(null)
+  const [sessionForm, setSessionForm] = useState(null)
+  const [savingSession, setSavingSession] = useState(false)
 
   useEffect(() => {
     load()
   }, [])
 
-  // Recalcula o cronômetro ao vivo enquanto tem sessão ativa
+  // Recalcula o cronômetro ao vivo (com segundos) enquanto tem sessão ativa
   useEffect(() => {
     if (!activeSession) return
-    const id = setInterval(() => setTick((t) => t + 1), 30000)
+    const id = setInterval(() => setTick((t) => t + 1), 1000)
     return () => clearInterval(id)
   }, [activeSession])
 
@@ -47,6 +52,7 @@ export default function TimeTracking() {
 
     setActiveSession(active || null)
     setSessions(recentSessions || [])
+    setAllTasks(tasks || [])
     setOpenTasks((tasks || []).filter((t) => t.status !== 'done'))
     setDoneTasksThisWeek(
       (tasks || []).filter((t) => t.status === 'done' && new Date(t.updated_at) >= thisWeek.start)
@@ -78,7 +84,7 @@ export default function TimeTracking() {
   async function handleEnd() {
     if (!activeSession) return
     const endedAt = new Date()
-    const duration = differenceInMinutes(endedAt, new Date(activeSession.started_at))
+    const duration = Math.round(differenceInSeconds(endedAt, new Date(activeSession.started_at)) / 60)
     const { error } = await supabase
       .from('work_sessions')
       .update({ ended_at: endedAt.toISOString(), duration_minutes: duration })
@@ -86,6 +92,56 @@ export default function TimeTracking() {
     if (error) toast.error('Erro ao encerrar ponto')
     else {
       toast.success(`Sessão encerrada: ${formatHours(duration)}`)
+      load()
+    }
+  }
+
+  function openEditSession(session) {
+    const start = new Date(session.started_at)
+    const end = session.ended_at ? new Date(session.ended_at) : null
+    setEditingSession(session)
+    setSessionForm({
+      category: session.category || 'aulas',
+      task_id: session.task_id || '',
+      date: format(start, 'yyyy-MM-dd'),
+      startTime: format(start, 'HH:mm'),
+      endTime: end ? format(end, 'HH:mm') : '',
+    })
+  }
+
+  async function handleSaveSession(e) {
+    e.preventDefault()
+    setSavingSession(true)
+    const startedAt = new Date(`${sessionForm.date}T${sessionForm.startTime}:00`)
+    const endedAt = sessionForm.endTime ? new Date(`${sessionForm.date}T${sessionForm.endTime}:00`) : null
+    if (endedAt && endedAt <= startedAt) {
+      toast.error('Horário de fim precisa ser depois do início')
+      setSavingSession(false)
+      return
+    }
+    const payload = {
+      category: sessionForm.category,
+      task_id: sessionForm.task_id || null,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt ? endedAt.toISOString() : null,
+      duration_minutes: endedAt ? differenceInMinutes(endedAt, startedAt) : null,
+    }
+    const { error } = await supabase.from('work_sessions').update(payload).eq('id', editingSession.id)
+    if (error) toast.error('Erro ao salvar sessão')
+    else {
+      toast.success('Sessão atualizada')
+      setEditingSession(null)
+      load()
+    }
+    setSavingSession(false)
+  }
+
+  async function handleDeleteSession(id) {
+    if (!confirm('Excluir esta sessão de ponto?')) return
+    const { error } = await supabase.from('work_sessions').delete().eq('id', id)
+    if (error) toast.error('Erro ao excluir')
+    else {
+      toast.success('Excluída')
       load()
     }
   }
@@ -137,8 +193,8 @@ export default function TimeTracking() {
               Trabalhando em <strong className="text-slate-600">{WORK_CATEGORY[activeSession.category]?.label}</strong> desde{' '}
               {formatDateTime(activeSession.started_at)}
             </p>
-            <p className="my-3 text-3xl font-semibold text-indigo-600">
-              {formatHours(differenceInMinutes(new Date(), new Date(activeSession.started_at)))}
+            <p className="my-3 font-mono text-3xl font-semibold tabular-nums text-indigo-600">
+              {formatStopwatch(differenceInSeconds(new Date(), new Date(activeSession.started_at)))}
             </p>
             <button
               onClick={handleEnd}
@@ -222,8 +278,120 @@ export default function TimeTracking() {
                 : ''}
             </p>
           </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">Sessões recentes</h3>
+            {sessions.filter((s) => s.ended_at).length === 0 ? (
+              <p className="text-sm text-slate-400">Nenhuma sessão encerrada ainda.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {sessions
+                  .filter((s) => s.ended_at)
+                  .map((s) => {
+                    const task = allTasks.find((t) => t.id === s.task_id)
+                    return (
+                      <div key={s.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                        <div className="min-w-0">
+                          <p className="text-slate-700">
+                            {WORK_CATEGORY[s.category]?.label || s.category}
+                            {task && <span className="text-slate-400"> · {task.title}</span>}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {formatDateTime(s.started_at)} – {format(new Date(s.ended_at), 'HH:mm')} ({formatHours(effectiveMinutes(s))})
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-1">
+                          <button onClick={() => openEditSession(s)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => handleDeleteSession(s.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+          </div>
         </div>
       )}
+
+      <Modal open={!!editingSession} onClose={() => setEditingSession(null)} title="Editar sessão">
+        {sessionForm && (
+          <>
+            <form id="session-form" onSubmit={handleSaveSession} className="space-y-4">
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Categoria</span>
+                <select
+                  value={sessionForm.category}
+                  onChange={(e) => setSessionForm({ ...sessionForm, category: e.target.value })}
+                  className="input"
+                >
+                  {Object.entries(WORK_CATEGORY).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Tarefa vinculada</span>
+                <select
+                  value={sessionForm.task_id}
+                  onChange={(e) => setSessionForm({ ...sessionForm, task_id: e.target.value })}
+                  className="input"
+                >
+                  <option value="">Sem tarefa vinculada</option>
+                  {allTasks.map((t) => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">Data</span>
+                <input
+                  type="date"
+                  required
+                  value={sessionForm.date}
+                  onChange={(e) => setSessionForm({ ...sessionForm, date: e.target.value })}
+                  className="input"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">Início</span>
+                  <input
+                    type="time"
+                    required
+                    value={sessionForm.startTime}
+                    onChange={(e) => setSessionForm({ ...sessionForm, startTime: e.target.value })}
+                    className="input"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">Fim</span>
+                  <input
+                    type="time"
+                    required
+                    value={sessionForm.endTime}
+                    onChange={(e) => setSessionForm({ ...sessionForm, endTime: e.target.value })}
+                    className="input"
+                  />
+                </label>
+              </div>
+            </form>
+            <div className="mt-2 flex gap-2 pt-2">
+              <button
+                type="submit"
+                form="session-form"
+                disabled={savingSession}
+                className="flex-1 rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {savingSession ? 'Salvando…' : 'Salvar'}
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   )
 }
