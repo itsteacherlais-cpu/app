@@ -14,7 +14,7 @@ const EMPTY_ITEM = {
   id: null,
   title: '',
   format: 'short',
-  platform: 'instagram',
+  platforms: ['instagram'],
   planned_publish_date: '',
   notes: '',
 }
@@ -53,20 +53,32 @@ export default function Content() {
   function openEdit(item) {
     setForm({
       ...item,
+      platforms: item.platforms || [],
       planned_publish_date: item.planned_publish_date || '',
       notes: item.notes || '',
     })
     setShowModal(true)
   }
 
+  function togglePlatform(key) {
+    setForm((f) => ({
+      ...f,
+      platforms: f.platforms.includes(key) ? f.platforms.filter((p) => p !== key) : [...f.platforms, key],
+    }))
+  }
+
   async function handleSave(e) {
     e.preventDefault()
+    if (form.platforms.length === 0) {
+      toast.error('Selecione pelo menos uma plataforma')
+      return
+    }
     setSaving(true)
     const payload = {
       user_id: user.id,
       title: form.title.trim(),
       format: form.format,
-      platform: form.platform,
+      platforms: form.platforms,
       planned_publish_date: form.planned_publish_date || null,
       notes: form.notes.trim() || null,
     }
@@ -173,7 +185,8 @@ export default function Content() {
                       <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3">
                         <p className="text-sm font-medium text-slate-900">{item.title}</p>
                         <p className="mt-1 text-xs text-slate-400">
-                          {CONTENT_FORMAT[item.format] || '—'} · {CONTENT_PLATFORM[item.platform] || '—'}
+                          {CONTENT_FORMAT[item.format] || '—'} ·{' '}
+                          {item.platforms?.length ? item.platforms.map((p) => CONTENT_PLATFORM[p] || p).join(', ') : '—'}
                           {item.planned_publish_date && ` · ${formatDate(item.planned_publish_date)}`}
                         </p>
                         <div className="mt-2 flex items-center justify-between">
@@ -224,22 +237,30 @@ export default function Content() {
               className="input"
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Formato">
-              <select value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} className="input">
-                <option value="short">Short</option>
-                <option value="long">Longo</option>
-              </select>
-            </Field>
-            <Field label="Plataforma">
-              <select value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })} className="input">
-                <option value="youtube">YouTube</option>
-                <option value="instagram">Instagram</option>
-                <option value="tiktok">TikTok</option>
-                <option value="outro">Outro</option>
-              </select>
-            </Field>
-          </div>
+          <Field label="Formato">
+            <select value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} className="input">
+              <option value="short">Short</option>
+              <option value="long">Longo</option>
+            </select>
+          </Field>
+          <Field label="Plataformas (pode marcar mais de uma)">
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(CONTENT_PLATFORM).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => togglePlatform(key)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    form.platforms.includes(key)
+                      ? 'border-indigo-600 bg-indigo-600 text-white'
+                      : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Field>
           <Field label="Data prevista de publicação">
             <input
               type="date"
