@@ -14,6 +14,9 @@ import {
   Megaphone,
   Film,
   Settings as SettingsIcon,
+  ListTodo,
+  Timer,
+  Trophy,
 } from 'lucide-react'
 
 const PRIMARY_ITEMS = [
@@ -30,6 +33,9 @@ const SECONDARY_ITEMS = [
   { to: '/financeiro', label: 'Financeiro', icon: Landmark },
   { to: '/marketing', label: 'Marketing', icon: Megaphone },
   { to: '/producao', label: 'Produção', icon: Film },
+  { to: '/tarefas', label: 'Tarefas', icon: ListTodo },
+  { to: '/ponto', label: 'Controle de Ponto', icon: Timer },
+  { to: '/conquistas', label: 'Conquistas', icon: Trophy },
   { to: '/configuracoes', label: 'Configurações', icon: SettingsIcon },
 ]
 

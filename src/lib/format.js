@@ -75,3 +75,38 @@ export const CONTENT_PLATFORM = {
   tiktok: 'TikTok',
   outro: 'Outro',
 }
+
+export const TASK_STATUS_ORDER = ['todo', 'doing', 'done']
+export const TASK_STATUS = {
+  todo: { label: 'A fazer' },
+  doing: { label: 'Fazendo' },
+  done: { label: 'Feito' },
+}
+
+export const TASK_CATEGORY = {
+  manual: { label: 'Manual/admin', className: 'bg-blue-50 text-blue-700', borderClassName: 'border-l-blue-400' },
+  criativa: { label: 'Criativa', className: 'bg-violet-50 text-violet-700', borderClassName: 'border-l-violet-400' },
+}
+
+export const TASK_PRIORITY = {
+  baixa: { label: 'Baixa', className: 'bg-slate-100 text-slate-500' },
+  media: { label: 'Média', className: 'bg-amber-50 text-amber-700' },
+  alta: { label: 'Alta', className: 'bg-red-50 text-red-700' },
+}
+
+export const WORK_CATEGORY = {
+  aulas: { label: 'Aulas', group: 'manual' },
+  administrativo: { label: 'Administrativo', group: 'manual' },
+  gravacao: { label: 'Gravação', group: 'criativa' },
+  edicao: { label: 'Edição', group: 'criativa' },
+  roteiro: { label: 'Roteiro', group: 'criativa' },
+  outro: { label: 'Outro', group: 'manual' },
+}
+
+export function formatHours(minutes) {
+  const h = Math.floor((minutes || 0) / 60)
+  const m = (minutes || 0) % 60
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}h`
+  return `${h}h${m}min`
+}

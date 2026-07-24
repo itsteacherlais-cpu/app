@@ -408,9 +408,19 @@ function GoalCard({ periodType, label, items }) {
       streak_count: newStreak,
     })
 
-    if (reportError || goalError) toast.error('Erro ao fechar ciclo')
-    else {
+    if (reportError || goalError) {
+      toast.error('Erro ao fechar ciclo')
+    } else {
       toast.success('Ciclo fechado! Nova meta criada.')
+      if (newStreak > 0 && newStreak % STREAK_TO_SUGGEST_INCREASE === 0) {
+        await supabase.from('achievements').insert({
+          user_id: user.id,
+          title: `🔥 ${newStreak} ciclos de meta de conteúdo seguidos!`,
+          description: `Meta ${label.toLowerCase()} batida ${newStreak} vezes seguidas.`,
+          milestone_type: 'conteudo',
+        })
+        toast.success('Conquista desbloqueada! Confira em Conquistas & Recompensas 🏆', { duration: 4000 })
+      }
       setShowClose(false)
       loadGoal()
     }

@@ -7,6 +7,7 @@ import { Plus, Check, Pencil, Trash2, AlertTriangle, Sparkles } from 'lucide-rea
 import { formatCurrency, formatDate, PAYMENT_STATUS } from '../lib/format'
 import { dueDateInMonth } from '../lib/finance'
 import { startOfMonth, endOfMonth, differenceInCalendarDays, format, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 const EMPTY_FORM = {
   id: null,
@@ -236,7 +237,35 @@ export default function Payments() {
       payment_id: p.id,
     })
     toast.success('Marcado como pago')
+    await checkAllPaidAchievement(p.reference_month)
     loadAll()
+  }
+
+  // Se todos os pagamentos do mês de referência estiverem pagos, desbloqueia
+  // uma conquista (uma única vez por mês).
+  async function checkAllPaidAchievement(referenceMonth) {
+    if (!referenceMonth) return
+    const { data: monthPayments } = await supabase.from('payments').select('status').eq('reference_month', referenceMonth)
+    if (!monthPayments || monthPayments.length === 0) return
+    const allPaid = monthPayments.every((mp) => mp.status === 'paid')
+    if (!allPaid) return
+
+    const monthLabel = format(parseISO(referenceMonth), 'MMMM/yyyy', { locale: ptBR })
+    const { data: existing } = await supabase
+      .from('achievements')
+      .select('id')
+      .eq('milestone_type', 'financeiro')
+      .eq('description', `Mês de referência: ${referenceMonth}`)
+      .maybeSingle()
+    if (existing) return
+
+    await supabase.from('achievements').insert({
+      user_id: user.id,
+      title: `💰 ${monthLabel} 100% em dia!`,
+      description: `Mês de referência: ${referenceMonth}`,
+      milestone_type: 'financeiro',
+    })
+    toast.success('Conquista desbloqueada! Confira em Conquistas & Recompensas 🏆', { duration: 4000 })
   }
 
   async function handleDelete(id) {

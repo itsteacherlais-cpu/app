@@ -15,6 +15,9 @@ const Finance = lazy(() => import('./pages/Finance'))
 const Marketing = lazy(() => import('./pages/Marketing'))
 const Production = lazy(() => import('./pages/Production'))
 const Settings = lazy(() => import('./pages/Settings'))
+const Tasks = lazy(() => import('./pages/Tasks'))
+const TimeTracking = lazy(() => import('./pages/TimeTracking'))
+const Achievements = lazy(() => import('./pages/Achievements'))
 
 function PageFallback() {
   return (
@@ -48,6 +51,9 @@ export default function App() {
               <Route path="/marketing" element={<Marketing />} />
               <Route path="/producao" element={<Production />} />
               <Route path="/configuracoes" element={<Settings />} />
+              <Route path="/tarefas" element={<Tasks />} />
+              <Route path="/ponto" element={<TimeTracking />} />
+              <Route path="/conquistas" element={<Achievements />} />
             </Route>
           </Routes>
         </Suspense>
