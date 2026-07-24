@@ -8,7 +8,11 @@ import {
   differenceInCalendarDays, differenceInMinutes, endOfDay, endOfWeek, startOfDay, startOfMonth, endOfMonth,
   startOfYear, subWeeks, addDays, format, parseISO,
 } from 'date-fns'
-import { CalendarDays, AlertCircle, Video, Clapperboard, FileText, ListTodo, Timer, Landmark, Gauge } from 'lucide-react'
+import {
+  CalendarDays, AlertCircle, Video, Clapperboard, FileText, ListTodo, Timer, Landmark, Gauge,
+  Sparkles, RefreshCw, Plus, Check,
+} from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -159,6 +163,8 @@ export default function Dashboard() {
         <p className="py-10 text-center text-sm text-slate-400">Carregando…</p>
       ) : (
         <div className="space-y-5">
+          <SuggestionsCard />
+
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
@@ -381,5 +387,130 @@ export default function Dashboard() {
         </div>
       )}
     </div>
+  )
+}
+
+function SuggestionsCard() {
+  const { user } = useAuth()
+  const [items, setItems] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [regenerating, setRegenerating] = useState(false)
+  const [error, setError] = useState(null)
+  const [addedIdx, setAddedIdx] = useState(new Set())
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function load() {
+    setLoading(true)
+    setError(null)
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const { data } = await supabase
+      .from('daily_suggestions')
+      .select('items')
+      .eq('suggestion_date', todayStr)
+      .maybeSingle()
+    if (data) {
+      setItems(data.items)
+      setLoading(false)
+    } else {
+      await generate(todayStr, false)
+    }
+  }
+
+  async function generate(dateStr, force) {
+    if (force) setRegenerating(true)
+    setError(null)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const resp = await fetch('/api/suggestions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ date: dateStr, force }),
+      })
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}))
+        throw new Error(body.error || 'Erro ao gerar sugestões')
+      }
+      const body = await resp.json()
+      setItems(body.items)
+      setAddedIdx(new Set())
+    } catch (err) {
+      setError(err.message || 'Erro ao gerar sugestões')
+    } finally {
+      setLoading(false)
+      setRegenerating(false)
+    }
+  }
+
+  async function addToContent(item, idx) {
+    const { error: insertError } = await supabase.from('content_items').insert({
+      user_id: user.id,
+      title: item.topic,
+      notes: item.idea,
+      format: 'short',
+      platforms: [],
+      status: 'idea',
+    })
+    if (insertError) toast.error('Erro ao adicionar ao quadro de Conteúdo')
+    else {
+      toast.success('Adicionado ao quadro de Conteúdo')
+      setAddedIdx((prev) => new Set(prev).add(idx))
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <Sparkles className="h-4 w-4 text-violet-600" /> Sugestões de hoje
+        </h2>
+        <button
+          onClick={() => generate(format(new Date(), 'yyyy-MM-dd'), true)}
+          disabled={loading || regenerating}
+          title="Gerar novas sugestões"
+          className="rounded-lg p-1.5 text-slate-400 hover:bg-white disabled:opacity-40"
+        >
+          <RefreshCw className={`h-4 w-4 ${regenerating ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-slate-400">Buscando temas em alta e gerando ideias…</p>
+      ) : error ? (
+        <p className="text-sm text-red-600">{error}</p>
+      ) : !items || items.length === 0 ? (
+        <p className="text-sm text-slate-400">Nenhuma sugestão disponível agora.</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div key={idx} className="rounded-lg bg-white/70 px-3 py-2 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-800">{item.topic}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{item.idea}</p>
+                </div>
+                <button
+                  onClick={() => addToContent(item, idx)}
+                  disabled={addedIdx.has(idx)}
+                  title="Adicionar ao quadro de Conteúdo"
+                  className={`shrink-0 rounded-lg p-1.5 ${
+                    addedIdx.has(idx) ? 'text-emerald-600' : 'text-violet-500 hover:bg-violet-100'
+                  }`}
+                >
+                  {addedIdx.has(idx) ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="mt-3 text-[11px] text-slate-400">
+        Temas em alta no Google Trends Brasil + ideias geradas por IA. Atualiza sozinho uma vez por dia.
+      </p>
+    </section>
   )
 }
