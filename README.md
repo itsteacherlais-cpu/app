@@ -21,6 +21,8 @@ Este projeto está sendo construído em fases. **Fases 1, 2 e 3 concluídas:**
 - **Controle de limite MEI** configurável (tela de Configurações), com soma automática do faturamento do ano, alertas por patamar (70/85/95%) e projeção de quando o teto seria atingido no ritmo atual
 - Módulo **Marketing & Infoproduto** (funil de leads/conversão, calendário de postagens em redes sociais, prospecção de parcerias/brand deals)
 - Módulo **Produção & Edição** (checklist técnico por vídeo com alerta de atraso)
+- **Contratos por aluno** (aulas contratadas, duração em meses) com aba própria em Alunos e alerta no Dashboard quando vence em até 30 dias
+- **Geração automática dos pagamentos do mês**: ao abrir Pagamentos, cria sozinho os lançamentos pendentes do mês pra cada aluno ativo (usando o dia de vencimento configurado em cada aluno), sem precisar cadastrar na mão
 
 Próxima fase: Tarefas + Controle de Ponto + Gamificação + Dashboard consolidado (Fase 4).
 

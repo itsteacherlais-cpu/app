@@ -3,14 +3,15 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency, formatTime, formatDate, CLASS_STATUS } from '../lib/format'
-import { differenceInCalendarDays, endOfDay, endOfWeek, startOfDay } from 'date-fns'
-import { CalendarDays, AlertCircle, Video, Clapperboard } from 'lucide-react'
+import { differenceInCalendarDays, endOfDay, endOfWeek, startOfDay, addDays, format } from 'date-fns'
+import { CalendarDays, AlertCircle, Video, Clapperboard, FileText } from 'lucide-react'
 
 export default function Dashboard() {
   const { user } = useAuth()
   const [todayClasses, setTodayClasses] = useState([])
   const [weekClasses, setWeekClasses] = useState([])
   const [pendingPayments, setPendingPayments] = useState([])
+  const [expiringContracts, setExpiringContracts] = useState([])
   const [contentGoal, setContentGoal] = useState(null)
   const [contentProduced, setContentProduced] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -22,7 +23,7 @@ export default function Dashboard() {
   async function load() {
     setLoading(true)
     const now = new Date()
-    const [{ data: today }, { data: week }, { data: pending }, { data: goals }] = await Promise.all([
+    const [{ data: today }, { data: week }, { data: pending }, { data: contracts }, { data: goals }] = await Promise.all([
       supabase
         .from('classes')
         .select('*, students(name)')
@@ -43,6 +44,12 @@ export default function Dashboard() {
         .neq('status', 'paid')
         .order('due_date', { ascending: true, nullsFirst: false }),
       supabase
+        .from('contracts')
+        .select('*, students(name)')
+        .gte('end_date', format(now, 'yyyy-MM-dd'))
+        .lte('end_date', format(addDays(now, 30), 'yyyy-MM-dd'))
+        .order('end_date', { ascending: true }),
+      supabase
         .from('content_goals')
         .select('*')
         .eq('period_type', 'week')
@@ -52,6 +59,7 @@ export default function Dashboard() {
     setTodayClasses(today || [])
     setWeekClasses(week || [])
     setPendingPayments(pending || [])
+    setExpiringContracts(contracts || [])
 
     const goal = goals?.[0] || null
     setContentGoal(goal)
@@ -155,6 +163,36 @@ export default function Dashboard() {
                   ))}
                 </div>
               </>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <FileText className="h-4 w-4 text-rose-600" /> Contratos vencendo
+              </h2>
+              <Link to="/alunos" className="text-xs font-medium text-indigo-600 hover:underline">
+                ver contratos
+              </Link>
+            </div>
+            {expiringContracts.length === 0 ? (
+              <p className="text-sm text-slate-400">Nenhum contrato vencendo nos próximos 30 dias.</p>
+            ) : (
+              <div className="space-y-2">
+                {expiringContracts.map((c) => {
+                  const daysLeft = differenceInCalendarDays(new Date(c.end_date), new Date())
+                  return (
+                    <div key={c.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                      <span className="text-slate-700">
+                        Contrato de <strong>{c.students?.name}</strong> vence
+                      </span>
+                      <span className="text-[11px] font-medium text-rose-600">
+                        {daysLeft <= 0 ? 'hoje' : `em ${daysLeft}d`} ({formatDate(c.end_date)})
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </section>
 

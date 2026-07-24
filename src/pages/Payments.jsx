@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
-import { Plus, Check, Pencil, Trash2, AlertTriangle } from 'lucide-react'
+import { Plus, Check, Pencil, Trash2, AlertTriangle, Sparkles } from 'lucide-react'
 import { formatCurrency, formatDate, PAYMENT_STATUS } from '../lib/format'
+import { dueDateInMonth } from '../lib/finance'
 import { startOfMonth, endOfMonth, differenceInCalendarDays, format } from 'date-fns'
 
 const EMPTY_FORM = {
@@ -34,13 +35,14 @@ export default function Payments() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [genMonth, setGenMonth] = useState(format(new Date(), 'yyyy-MM'))
+  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
-    loadAll()
+    init()
   }, [])
 
-  async function loadAll() {
-    setLoading(true)
+  async function fetchData() {
     const [{ data: p, error: pErr }, { data: s }] = await Promise.all([
       supabase
         .from('payments')
@@ -49,9 +51,67 @@ export default function Payments() {
       supabase.from('students').select('*').eq('status', 'active').order('name'),
     ])
     if (pErr) toast.error('Erro ao carregar pagamentos')
-    else setPayments(p)
-    setStudents(s || [])
+    return { payments: p || [], students: s || [] }
+  }
+
+  async function loadAll() {
+    setLoading(true)
+    const { payments: p, students: s } = await fetchData()
+    setPayments(p)
+    setStudents(s)
     setLoading(false)
+  }
+
+  // Ao abrir a tela, gera automaticamente os pagamentos pendentes do mês
+  // atual pra cada aluno ativo que ainda não tem um lançamento nesse mês —
+  // assim ela só precisa marcar como pago, sem cadastrar na mão.
+  async function init() {
+    setLoading(true)
+    const { payments: p, students: s } = await fetchData()
+    const currentMonthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+    const created = await generateMissing(currentMonthStart, p, s)
+    if (created > 0) {
+      const fresh = await fetchData()
+      setPayments(fresh.payments)
+      setStudents(fresh.students)
+    } else {
+      setPayments(p)
+      setStudents(s)
+    }
+    setLoading(false)
+  }
+
+  async function generateMissing(monthStartStr, existingPayments, activeStudents) {
+    const missing = activeStudents.filter(
+      (st) => !existingPayments.some((pay) => pay.student_id === st.id && pay.reference_month === monthStartStr)
+    )
+    if (missing.length === 0) return 0
+    const monthStart = new Date(`${monthStartStr}T00:00:00`)
+    const rows = missing.map((st) => ({
+      user_id: user.id,
+      student_id: st.id,
+      amount: st.rate_value,
+      reference_month: monthStartStr,
+      due_date: dueDateInMonth(monthStart, st.payment_due_day),
+      status: 'pending',
+    }))
+    const { error } = await supabase.from('payments').insert(rows)
+    if (error) {
+      toast.error('Erro ao gerar pagamentos do mês')
+      return 0
+    }
+    toast.success(`${rows.length} pagamento(s) do mês gerado(s) automaticamente`)
+    return rows.length
+  }
+
+  async function handleGenerateMonth() {
+    setGenerating(true)
+    const monthStartStr = `${genMonth}-01`
+    const { payments: p, students: s } = await fetchData()
+    const created = await generateMissing(monthStartStr, p, s)
+    if (created === 0) toast('Nenhum pagamento novo pra gerar nesse mês', { icon: 'ℹ️' })
+    await loadAll()
+    setGenerating(false)
   }
 
   const withEffectiveStatus = useMemo(() => {
@@ -203,6 +263,26 @@ export default function Payments() {
         <SummaryCard label="A receber (mês)" value={formatCurrency(monthSummary.aReceber)} tone="amber" />
         <SummaryCard label="Recebido (mês)" value={formatCurrency(monthSummary.recebido)} tone="emerald" />
         <SummaryCard label="Inadimplentes" value={monthSummary.inadimplentes} tone="red" />
+      </div>
+
+      <div className="mb-5 flex items-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 p-3">
+        <Sparkles className="h-4 w-4 shrink-0 text-indigo-500" />
+        <p className="flex-1 text-xs text-slate-600">
+          Gerar pagamentos pendentes de outro mês (o do mês atual já é gerado sozinho ao abrir esta tela).
+        </p>
+        <input
+          type="month"
+          value={genMonth}
+          onChange={(e) => setGenMonth(e.target.value)}
+          className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+        />
+        <button
+          onClick={handleGenerateMonth}
+          disabled={generating}
+          className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+        >
+          {generating ? 'Gerando…' : 'Gerar'}
+        </button>
       </div>
 
       <div className="mb-4 flex gap-1.5 overflow-x-auto">

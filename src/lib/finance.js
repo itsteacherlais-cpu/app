@@ -1,5 +1,12 @@
-import { startOfYear, endOfYear, startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
+import { startOfYear, endOfYear, startOfMonth, endOfMonth, subMonths, format, getDaysInMonth, setDate } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+
+// Vencimento de um mês específico respeitando o "dia" configurado,
+// mas sem estourar o mês (ex.: dia 31 em fevereiro vira o último dia).
+export function dueDateInMonth(monthStart, day) {
+  const clampedDay = Math.min(Number(day) || 1, getDaysInMonth(monthStart))
+  return format(setDate(monthStart, clampedDay), 'yyyy-MM-dd')
+}
 
 export function getYearRange(date = new Date()) {
   return { start: startOfYear(date), end: endOfYear(date) }
