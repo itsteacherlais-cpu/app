@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, AlertTriangle, Settings as SettingsIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { formatCurrency, formatDate } from '../lib/format'
-import { getYearRange, getLastMonths, monthKey } from '../lib/finance'
+import { getYearRange, getLastMonths } from '../lib/finance'
 import { startOfMonth, endOfMonth, format, differenceInCalendarMonths } from 'date-fns'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -110,13 +110,16 @@ export default function Finance() {
     }
   }
 
-  const currentMonthRange = { start: startOfMonth(new Date()), end: endOfMonth(new Date()) }
+  // Comparações por string ("yyyy-MM-dd" / "yyyy-MM"), não por Date: occurred_on
+  // é uma coluna "date" pura do Postgres, então comparar como texto evita
+  // qualquer problema de fuso horário na conversão pra Date.
+  const currentMonthRange = {
+    start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+    end: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+  }
   const monthTransactions = useMemo(
-    () =>
-      yearTransactions.filter(
-        (t) => new Date(t.occurred_on) >= currentMonthRange.start && new Date(t.occurred_on) <= currentMonthRange.end
-      ),
-    [yearTransactions]
+    () => yearTransactions.filter((t) => t.occurred_on >= currentMonthRange.start && t.occurred_on <= currentMonthRange.end),
+    [yearTransactions, currentMonthRange.start, currentMonthRange.end]
   )
   const monthIncome = monthTransactions.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
   const monthExpense = monthTransactions.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
@@ -128,17 +131,17 @@ export default function Finance() {
     const months = getLastMonths(6)
     return months.map((m) => {
       const income = chartTransactions
-        .filter((t) => t.type === 'income' && monthKey(new Date(t.occurred_on)) === m.key)
+        .filter((t) => t.type === 'income' && t.occurred_on.slice(0, 7) === m.key)
         .reduce((s, t) => s + Number(t.amount), 0)
       const expense = chartTransactions
-        .filter((t) => t.type === 'expense' && monthKey(new Date(t.occurred_on)) === m.key)
+        .filter((t) => t.type === 'expense' && t.occurred_on.slice(0, 7) === m.key)
         .reduce((s, t) => s + Number(t.amount), 0)
       return { mes: m.label, Receita: income, Despesa: expense }
     })
   }, [chartTransactions])
 
   const filteredList = useMemo(
-    () => yearTransactions.filter((t) => monthKey(new Date(t.occurred_on)) === monthFilter).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on)),
+    () => yearTransactions.filter((t) => t.occurred_on.slice(0, 7) === monthFilter).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on)),
     [yearTransactions, monthFilter]
   )
 

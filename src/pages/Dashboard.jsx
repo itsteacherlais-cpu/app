@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency, formatTime, formatDate, CLASS_STATUS } from '../lib/format'
-import { differenceInCalendarDays, endOfDay, endOfWeek, startOfDay, addDays, format } from 'date-fns'
+import { differenceInCalendarDays, endOfDay, endOfWeek, startOfDay, addDays, format, parseISO } from 'date-fns'
 import { CalendarDays, AlertCircle, Video, Clapperboard, FileText } from 'lucide-react'
 
 export default function Dashboard() {
@@ -79,7 +79,7 @@ export default function Dashboard() {
     const now = new Date()
     return pendingPayments.map((p) => ({
       ...p,
-      daysOverdue: p.due_date ? differenceInCalendarDays(now, new Date(p.due_date)) : null,
+      daysOverdue: p.due_date ? differenceInCalendarDays(now, parseISO(p.due_date)) : null,
     }))
   }, [pendingPayments])
 
@@ -180,7 +180,7 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-2">
                 {expiringContracts.map((c) => {
-                  const daysLeft = differenceInCalendarDays(new Date(c.end_date), new Date())
+                  const daysLeft = differenceInCalendarDays(parseISO(c.end_date), new Date())
                   return (
                     <div key={c.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
                       <span className="text-slate-700">

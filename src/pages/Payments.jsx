@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { Plus, Check, Pencil, Trash2, AlertTriangle, Sparkles } from 'lucide-react'
 import { formatCurrency, formatDate, PAYMENT_STATUS } from '../lib/format'
 import { dueDateInMonth } from '../lib/finance'
-import { startOfMonth, endOfMonth, differenceInCalendarDays, format } from 'date-fns'
+import { startOfMonth, endOfMonth, differenceInCalendarDays, format, parseISO } from 'date-fns'
 
 const EMPTY_FORM = {
   id: null,
@@ -117,7 +117,7 @@ export default function Payments() {
   const withEffectiveStatus = useMemo(() => {
     const today = new Date()
     return payments.map((p) => {
-      const daysOverdue = p.due_date ? differenceInCalendarDays(today, new Date(p.due_date)) : null
+      const daysOverdue = p.due_date ? differenceInCalendarDays(today, parseISO(p.due_date)) : null
       const isOverdue = p.status !== 'paid' && daysOverdue !== null && daysOverdue > 0
       return { ...p, daysOverdue, isOverdue }
     })
@@ -130,12 +130,14 @@ export default function Payments() {
   }, [withEffectiveStatus, filter])
 
   const monthSummary = useMemo(() => {
-    const now = new Date()
-    const start = startOfMonth(now)
-    const end = endOfMonth(now)
+    // Comparação por string ("yyyy-MM-dd"), não por Date: reference_month/due_date
+    // são colunas "date" puras do Postgres, então comparar como texto evita
+    // qualquer problema de fuso horário na conversão pra Date.
+    const monthStartStr = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+    const monthEndStr = format(endOfMonth(new Date()), 'yyyy-MM-dd')
     const inMonth = payments.filter((p) => {
-      const ref = p.reference_month ? new Date(p.reference_month) : p.due_date ? new Date(p.due_date) : null
-      return ref && ref >= start && ref <= end
+      const ref = p.reference_month || p.due_date
+      return ref && ref >= monthStartStr && ref <= monthEndStr
     })
     const recebido = inMonth.filter((p) => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0)
     const aReceber = inMonth.filter((p) => p.status !== 'paid').reduce((s, p) => s + Number(p.amount), 0)

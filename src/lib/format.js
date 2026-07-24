@@ -1,3 +1,11 @@
+import { parseISO } from 'date-fns'
+
+// Usamos parseISO (não `new Date(string)`) porque strings de data "pura"
+// vindas do Postgres (ex.: "2026-07-24", sem horário) são interpretadas
+// pelo `new Date()` nativo como UTC, o que pode "voltar" um dia em
+// fusos negativos como o do Brasil. parseISO interpreta esse formato
+// no horário local, e continua correto para timestamps completos
+// (com hora e timezone, ex.: scheduled_at).
 export function formatCurrency(value) {
   const n = Number(value ?? 0)
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -5,13 +13,13 @@ export function formatCurrency(value) {
 
 export function formatDate(dateStr, opts) {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
+  const d = parseISO(dateStr)
   return d.toLocaleDateString('pt-BR', opts)
 }
 
 export function formatDateTime(dateStr) {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
+  const d = parseISO(dateStr)
   return d.toLocaleString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
@@ -22,7 +30,7 @@ export function formatDateTime(dateStr) {
 
 export function formatTime(dateStr) {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
+  const d = parseISO(dateStr)
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 

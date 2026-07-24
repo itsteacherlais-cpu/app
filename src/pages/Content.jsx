@@ -8,7 +8,7 @@ import {
   formatDate, CONTENT_STATUS, CONTENT_STATUS_ORDER, CONTENT_FORMAT, CONTENT_PLATFORM,
 } from '../lib/format'
 import { getPeriodRange } from '../lib/period'
-import { format, isBefore } from 'date-fns'
+import { format, isBefore, parseISO } from 'date-fns'
 
 const EMPTY_ITEM = {
   id: null,
@@ -335,14 +335,19 @@ function GoalCard({ periodType, label, items }) {
 
   // "cycleEnded" = a meta mais recente já passou da data final e ainda não foi
   // fechada (ou seja, ainda não geramos o relatório e a próxima meta pra ela).
-  const cycleEnded = !!goal && isBefore(new Date(goal.period_end), new Date())
+  const cycleEnded = !!goal && isBefore(parseISO(goal.period_end), new Date())
 
+  // Comparação por string ("yyyy-MM-dd"), não por Date: period_start/end e
+  // published_date são colunas "date" puras do Postgres, então comparar como
+  // texto evita qualquer problema de fuso horário na conversão pra Date.
   const producedCount = useMemo(() => {
     if (!goal) return 0
-    const start = new Date(goal.period_start)
-    const end = new Date(goal.period_end)
     return items.filter(
-      (i) => i.status === 'published' && i.published_date && new Date(i.published_date) >= start && new Date(i.published_date) <= end
+      (i) =>
+        i.status === 'published' &&
+        i.published_date &&
+        i.published_date >= goal.period_start &&
+        i.published_date <= goal.period_end
     ).length
   }, [items, goal])
 
@@ -390,7 +395,7 @@ function GoalCard({ periodType, label, items }) {
       next_steps: closeForm.next_steps || null,
     })
 
-    const nextStart = new Date(goal.period_end)
+    const nextStart = parseISO(goal.period_end)
     nextStart.setDate(nextStart.getDate() + 1)
     const nextRange = getPeriodRange(periodType, nextStart)
 

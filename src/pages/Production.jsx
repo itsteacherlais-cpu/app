@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import { AlertTriangle, CheckCircle2, Circle } from 'lucide-react'
 import { formatDate, CONTENT_STATUS } from '../lib/format'
-import { isBefore } from 'date-fns'
+import { isBefore, parseISO } from 'date-fns'
 
 const CHECKLIST_STEPS = [
   ['roteiro', 'Roteiro pronto'],
@@ -82,7 +82,7 @@ export default function Production() {
         const production = productionItems[item.id]
         const checklist = production?.checklist || DEFAULT_CHECKLIST
         const doneCount = CHECKLIST_STEPS.filter(([k]) => checklist[k]).length
-        const overdue = production?.due_date && isBefore(new Date(production.due_date), new Date()) && doneCount < CHECKLIST_STEPS.length
+        const overdue = production?.due_date && isBefore(parseISO(production.due_date), new Date()) && doneCount < CHECKLIST_STEPS.length
         return { item, production, checklist, doneCount, overdue }
       }),
     [contentItems, productionItems]
