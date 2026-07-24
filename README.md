@@ -27,7 +27,7 @@ Este projeto está sendo construído em fases. **Fases 1, 2, 3 e 4 concluídas �
 - **Controle de Ponto**: botão de bater ponto (com cronômetro ao vivo) vinculado a categoria e/ou tarefa, totais de hoje e da semana, comparativo com a semana anterior (inclusive por categoria manual x criativa), e lista de tarefas concluídas na semana
 - **Conquistas & Recompensas**: conquistas desbloqueadas automaticamente (streak de metas de conteúdo, mês de pagamentos 100% em dia) com sistema simples de pontos, e recompensas pessoais que você cadastra vinculadas aos seus próprios marcos
 - **Dashboard consolidado**: aulas do dia, tarefas urgentes, pagamentos pendentes, contratos vencendo, meta de conteúdo da semana, financeiro do mês, horas trabalhadas (semana atual x anterior) e barra do limite MEI — tudo em uma tela só
-- **Sugestões diárias de conteúdo**: no topo do Dashboard, 10 temas em alta no Google Trends Brasil + ideias geradas por IA (Claude) conectando cada tema ao ensino de inglês, com botão pra já mandar a ideia direto pro quadro de Conteúdo. Atualiza sozinho uma vez por dia (cache no banco), com botão manual pra gerar de novo.
+- **Sugestões diárias de conteúdo** (100% gratuito, sem chave de API): no topo do Dashboard, 10 temas em alta no Google Trends Brasil (feed público) + uma ideia de conteúdo conectando cada tema ao ensino de inglês (sorteada de um banco de modelos de ideia), com botão pra já mandar a ideia direto pro quadro de Conteúdo. Atualiza sozinho uma vez por dia (cache no banco), com botão manual pra gerar de novo.
 
 Todas as 4 fases do plano original estão prontas. Próximos passos ficam a critério de ajustes e refinamentos sob demanda.
 
@@ -59,7 +59,6 @@ cp .env.example .env
 - `ZOOM_ACCOUNT_ID` / `ZOOM_CLIENT_ID` / `ZOOM_CLIENT_SECRET`: crie um app **Server-to-Server OAuth** em [marketplace.zoom.us](https://marketplace.zoom.us/) com o escopo `meeting:write:meeting` e `meeting:read:meeting` (admin). Copie as credenciais geradas.
 - `ZOOM_USER_ID`: normalmente `me` (cria as reuniões no seu próprio calendário Zoom).
 - `ZOOM_WEBHOOK_SECRET_TOKEN` (opcional, mas recomendado): em **Feature > Event Subscriptions** do seu app Zoom, adicione a URL `https://SEU-DOMINIO/api/zoom/webhook`, assine os eventos `Meeting Updated` e `Meeting Deleted`, e copie o "Secret Token" gerado.
-- `ANTHROPIC_API_KEY`: usada só na função serverless que gera as sugestões diárias de conteúdo. Crie uma chave em [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (precisa cadastrar um método de pagamento — o uso é bem baixo, poucos centavos por mês pra essa função).
 
 ### 4. Rodar localmente
 

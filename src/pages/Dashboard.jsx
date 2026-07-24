@@ -509,7 +509,7 @@ function SuggestionsCard() {
         </div>
       )}
       <p className="mt-3 text-[11px] text-slate-400">
-        Temas em alta no Google Trends Brasil + ideias geradas por IA. Atualiza sozinho uma vez por dia.
+        Temas em alta no Google Trends Brasil + ideia de conteúdo pra conectar com inglês. Atualiza sozinho uma vez por dia.
       </p>
     </section>
   )

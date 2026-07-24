@@ -1,27 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '../_lib/auth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { getTrendingTopicsBR } from '../_lib/trends.js'
-
-const SUGGESTIONS_SCHEMA = {
-  type: 'object',
-  properties: {
-    suggestions: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          topic: { type: 'string' },
-          idea: { type: 'string' },
-        },
-        required: ['topic', 'idea'],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ['suggestions'],
-  additionalProperties: false,
-}
+import { pickRandomIdea } from '../_lib/ideaTemplates.js'
 
 // Data é decidida pelo cliente (fuso local dela), não pelo servidor — evita
 // o mesmo tipo de descompasso de fuso horário já corrigido em outras telas.
@@ -57,38 +37,14 @@ export default requireAuth(async function handler(req, res) {
   }
 
   try {
-    const topics = await getTrendingTopicsBR(15)
+    // 100% gratuito: temas reais do Google Trends (feed público, sem chave)
+    // + ideias geradas por modelos de frase locais (sem chamada a nenhuma IA paga).
+    const topics = await getTrendingTopicsBR(10)
     if (topics.length === 0) {
       throw new Error('Nenhum tema em alta encontrado agora, tenta de novo mais tarde')
     }
 
-    const anthropic = new Anthropic()
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 2048,
-      system:
-        'Você ajuda a Teacher Laís, professora de inglês (aulas particulares) e criadora de ' +
-        'conteúdo sobre inglês no YouTube/Instagram/TikTok, a conectar assuntos em alta no ' +
-        'Brasil com ideias de conteúdo educacional sobre inglês.',
-      messages: [
-        {
-          role: 'user',
-          content:
-            `Temas em alta hoje no Brasil (Google Trends):\n${topics.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\n` +
-            'Escolha até 10 desses temas e, para cada um, sugira uma ideia curta e prática de ' +
-            'conteúdo (vídeo ou post) conectando o tema ao ensino de inglês — por exemplo, ' +
-            'vocabulário relacionado, expressões/gírias em inglês sobre o assunto, ou como usar ' +
-            'o tema pra ensinar uma estrutura gramatical específica. Seja específica e criativa, ' +
-            'evite ideias genéricas tipo "fale sobre X em inglês".',
-        },
-      ],
-      output_config: { format: { type: 'json_schema', schema: SUGGESTIONS_SCHEMA } },
-    })
-
-    const textBlock = response.content.find((b) => b.type === 'text')
-    if (!textBlock) throw new Error('Resposta vazia da IA')
-    const parsed = JSON.parse(textBlock.text)
-    const items = (parsed.suggestions || []).slice(0, 10)
+    const items = topics.map((topic) => ({ topic, idea: pickRandomIdea(topic) }))
 
     const { error: upsertError } = await supabase
       .from('daily_suggestions')
