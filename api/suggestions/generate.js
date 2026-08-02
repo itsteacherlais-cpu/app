@@ -1,7 +1,6 @@
 import { requireAuth } from '../_lib/auth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { getCelebGossipHeadlines } from '../_lib/gossip.js'
-import { pickRandomIdea } from '../_lib/ideaTemplates.js'
 
 // Data é decidida pelo cliente (fuso local dela), não pelo servidor — evita
 // o mesmo tipo de descompasso de fuso horário já corrigido em outras telas.
@@ -38,14 +37,13 @@ export default requireAuth(async function handler(req, res) {
 
   try {
     // 100% gratuito: manchetes de fofoca/entretenimento de sites dos EUA e
-    // Europa (feeds RSS públicos, sem chave) + ideias geradas por modelos de
-    // frase locais (sem chamada a nenhuma IA paga).
-    const topics = await getCelebGossipHeadlines(3)
-    if (topics.length === 0) {
+    // Europa (feeds RSS públicos, sem chave), com link direto pra matéria.
+    const headlines = await getCelebGossipHeadlines(3)
+    if (headlines.length === 0) {
       throw new Error('Nenhuma fofoca encontrada agora, tenta de novo mais tarde')
     }
 
-    const items = topics.map((topic) => ({ topic, idea: pickRandomIdea(topic) }))
+    const items = headlines.map((h) => ({ topic: h.title, link: h.link }))
 
     const { error: upsertError } = await supabase
       .from('daily_suggestions')

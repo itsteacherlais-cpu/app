@@ -16,21 +16,24 @@ const GOSSIP_RSS_FEEDS = [
 const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
-function parseRssTitles(xml) {
+function parseRssItems(xml) {
   const itemBlocks = xml.split('<item>').slice(1)
   return itemBlocks
     .map((block) => {
-      const match = block.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/s)
-      return match ? match[1].trim() : null
+      const titleMatch = block.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/s)
+      const linkMatch = block.match(/<link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/link>/s)
+      const title = titleMatch ? titleMatch[1].trim() : null
+      const link = linkMatch ? linkMatch[1].trim() : null
+      return title && link ? { title, link } : null
     })
     .filter(Boolean)
 }
 
-async function fetchFeedTitles(url) {
+async function fetchFeedItems(url) {
   try {
     const resp = await fetch(url, { headers: { 'User-Agent': BROWSER_USER_AGENT } })
     if (!resp.ok) return []
-    return parseRssTitles(await resp.text())
+    return parseRssItems(await resp.text())
   } catch {
     return []
   }
@@ -46,9 +49,14 @@ function shuffle(list) {
 }
 
 export async function getCelebGossipHeadlines(limit = 3) {
-  const perFeed = await Promise.all(GOSSIP_RSS_FEEDS.map(fetchFeedTitles))
+  const perFeed = await Promise.all(GOSSIP_RSS_FEEDS.map(fetchFeedItems))
   const all = perFeed.flat()
-  const unique = [...new Set(all)]
+  const seenTitles = new Set()
+  const unique = all.filter((item) => {
+    if (seenTitles.has(item.title)) return false
+    seenTitles.add(item.title)
+    return true
+  })
   if (unique.length === 0) {
     throw new Error('Não encontramos fofocas agora, tenta de novo mais tarde')
   }

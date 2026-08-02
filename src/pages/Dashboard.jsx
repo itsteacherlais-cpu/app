@@ -10,7 +10,7 @@ import {
 } from 'date-fns'
 import {
   CalendarDays, AlertCircle, Video, Clapperboard, FileText, ListTodo, Timer, Landmark, Gauge,
-  Sparkles, RefreshCw, Plus, Check,
+  Sparkles, RefreshCw, Plus, Check, ExternalLink,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -450,7 +450,7 @@ function SuggestionsCard() {
     const { error: insertError } = await supabase.from('content_items').insert({
       user_id: user.id,
       title: item.topic,
-      notes: item.idea,
+      notes: item.link,
       format: 'short',
       platforms: [],
       status: 'idea',
@@ -479,7 +479,7 @@ function SuggestionsCard() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-slate-400">Buscando fofocas em alta e gerando ideias…</p>
+        <p className="text-sm text-slate-400">Buscando fofocas em alta…</p>
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : !items || items.length === 0 ? (
@@ -491,7 +491,16 @@ function SuggestionsCard() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800">{item.topic}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">{item.idea}</p>
+                  {item.link && (
+                    <a
+                      href={item.link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:underline"
+                    >
+                      Ler matéria completa <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
                 </div>
                 <button
                   onClick={() => addToContent(item, idx)}
@@ -509,7 +518,7 @@ function SuggestionsCard() {
         </div>
       )}
       <p className="mt-3 text-[11px] text-slate-400">
-        Fofocas de famosas/filmes/séries/música em alta em sites dos EUA e Europa + ideia de conteúdo pra ensinar inglês com o assunto. Atualiza sozinho uma vez por dia.
+        3 fofocas de famosas/filmes/séries/música em alta em sites dos EUA e Europa, com link direto pra matéria. Atualiza sozinho uma vez por dia.
       </p>
     </section>
   )
