@@ -22,8 +22,9 @@ export async function createZoomMeetingForClass({ classId, topic, startTime, dur
   return resp.json()
 }
 
-export async function updateZoomMeeting(meetingId, { topic, startTime, durationMinutes, agenda }) {
-  const resp = await fetch(`/api/zoom/meetings/${meetingId}`, {
+export async function updateZoomMeeting(meetingId, { topic, startTime, durationMinutes, agenda, classId }) {
+  const qs = classId ? `?classId=${encodeURIComponent(classId)}` : ''
+  const resp = await fetch(`/api/zoom/meetings/${meetingId}${qs}`, {
     method: 'PATCH',
     headers: await authHeaders(),
     body: JSON.stringify({ topic, startTime, durationMinutes, agenda }),
@@ -35,8 +36,9 @@ export async function updateZoomMeeting(meetingId, { topic, startTime, durationM
   return resp.json()
 }
 
-export async function deleteZoomMeeting(meetingId) {
-  const resp = await fetch(`/api/zoom/meetings/${meetingId}`, {
+export async function deleteZoomMeeting(meetingId, classId) {
+  const qs = classId ? `?classId=${encodeURIComponent(classId)}` : ''
+  const resp = await fetch(`/api/zoom/meetings/${meetingId}${qs}`, {
     method: 'DELETE',
     headers: await authHeaders(),
   })
@@ -47,8 +49,9 @@ export async function deleteZoomMeeting(meetingId) {
   return resp.json()
 }
 
-export async function syncZoomMeeting(meetingId) {
-  const resp = await fetch(`/api/zoom/meetings/${meetingId}`, {
+export async function syncZoomMeeting(meetingId, classId) {
+  const qs = classId ? `?classId=${encodeURIComponent(classId)}` : ''
+  const resp = await fetch(`/api/zoom/meetings/${meetingId}${qs}`, {
     method: 'GET',
     headers: await authHeaders(),
   })
@@ -71,11 +74,11 @@ export async function listImportableZoomMeetings() {
   return resp.json()
 }
 
-export async function importZoomMeeting({ meetingId, studentId }) {
+export async function importZoomMeeting({ meetingId, studentId, startTime, durationMinutes, joinUrl }) {
   const resp = await fetch('/api/zoom/meetings/import', {
     method: 'POST',
     headers: await authHeaders(),
-    body: JSON.stringify({ meetingId, studentId }),
+    body: JSON.stringify({ meetingId, studentId, startTime, durationMinutes, joinUrl }),
   })
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}))

@@ -52,7 +52,16 @@ function guessStudentForTopic(topic, students) {
   return null
 }
 
-function getDismissedZoomIds() {
+// Reuniões recorrentes (ex.: aula fixa toda segunda) usam o MESMO id de
+// reunião no Zoom pra cada ocorrência futura — só o horário muda. Por isso a
+// identidade de cada linha na lista de importação é id + horário, não só o
+// id, senão as ocorrências futuras se confundiriam entre si (mesmo aluno
+// selecionado pra todas, ignorar uma ignoraria todas, etc.).
+function meetingKey(m) {
+  return `${m.id}::${m.startTime}`
+}
+
+function getDismissedZoomKeys() {
   try {
     return new Set(JSON.parse(localStorage.getItem(DISMISSED_ZOOM_KEY) || '[]'))
   } catch {
@@ -60,9 +69,9 @@ function getDismissedZoomIds() {
   }
 }
 
-function addDismissedZoomId(id) {
-  const current = getDismissedZoomIds()
-  current.add(String(id))
+function addDismissedZoomKey(key) {
+  const current = getDismissedZoomKeys()
+  current.add(key)
   localStorage.setItem(DISMISSED_ZOOM_KEY, JSON.stringify([...current]))
 }
 
@@ -125,8 +134,8 @@ export default function Calendar() {
     setLoadingImportable(true)
     try {
       const { meetings } = await listImportableZoomMeetings()
-      const dismissed = getDismissedZoomIds()
-      setImportable((meetings || []).filter((m) => !dismissed.has(String(m.id))))
+      const dismissed = getDismissedZoomKeys()
+      setImportable((meetings || []).filter((m) => !dismissed.has(meetingKey(m))))
     } catch (err) {
       toast.error(err.message || 'Erro ao buscar reuniões do Zoom')
     } finally {
@@ -140,9 +149,10 @@ export default function Calendar() {
       const next = { ...prev }
       let changed = false
       for (const m of importable) {
-        if (next[m.id] === undefined) {
+        const key = meetingKey(m)
+        if (next[key] === undefined) {
           const guess = guessStudentForTopic(m.topic, students)
-          next[m.id] = guess ? guess.id : ''
+          next[key] = guess ? guess.id : ''
           changed = true
         }
       }
@@ -151,20 +161,27 @@ export default function Calendar() {
   }, [importable, students])
 
   function handleDismiss(meeting) {
-    addDismissedZoomId(meeting.id)
-    setImportable((prev) => prev.filter((m) => m.id !== meeting.id))
+    addDismissedZoomKey(meetingKey(meeting))
+    setImportable((prev) => prev.filter((m) => meetingKey(m) !== meetingKey(meeting)))
   }
 
   async function handleImport(meeting) {
-    const studentId = importPicks[meeting.id]
+    const key = meetingKey(meeting)
+    const studentId = importPicks[key]
     if (!studentId) {
       toast.error('Selecione o aluno dessa reunião')
       return
     }
-    setImportingId(meeting.id)
+    setImportingId(key)
     try {
-      await importZoomMeeting({ meetingId: meeting.id, studentId })
-      setImportable((prev) => prev.filter((m) => m.id !== meeting.id))
+      await importZoomMeeting({
+        meetingId: meeting.id,
+        studentId,
+        startTime: meeting.startTime,
+        durationMinutes: meeting.durationMinutes,
+        joinUrl: meeting.joinUrl,
+      })
+      setImportable((prev) => prev.filter((m) => meetingKey(m) !== key))
       toast.success('Aula importada do Zoom')
       loadClasses()
     } catch (err) {
@@ -175,7 +192,7 @@ export default function Calendar() {
   }
 
   async function handleImportAll() {
-    const toImport = importable.filter((m) => importPicks[m.id])
+    const toImport = importable.filter((m) => importPicks[meetingKey(m)])
     if (toImport.length === 0) {
       toast.error('Nenhuma reunião com aluno selecionado ainda')
       return
@@ -183,10 +200,17 @@ export default function Calendar() {
     setImportingAll(true)
     let successCount = 0
     for (const m of toImport) {
+      const key = meetingKey(m)
       try {
-        await importZoomMeeting({ meetingId: m.id, studentId: importPicks[m.id] })
+        await importZoomMeeting({
+          meetingId: m.id,
+          studentId: importPicks[key],
+          startTime: m.startTime,
+          durationMinutes: m.durationMinutes,
+          joinUrl: m.joinUrl,
+        })
         successCount++
-        setImportable((prev) => prev.filter((x) => x.id !== m.id))
+        setImportable((prev) => prev.filter((x) => meetingKey(x) !== key))
       } catch (err) {
         toast.error(`Falha ao importar "${m.topic}": ${err.message || 'erro'}`)
       }
@@ -279,12 +303,13 @@ export default function Calendar() {
 
         if (form.zoom_meeting_id) {
           if (form.status === 'canceled') {
-            await deleteZoomMeeting(form.zoom_meeting_id).catch(() => {})
+            await deleteZoomMeeting(form.zoom_meeting_id, form.id).catch(() => {})
           } else {
             await updateZoomMeeting(form.zoom_meeting_id, {
               topic: `Aula de inglês - ${student?.name ?? ''}`,
               startTime: scheduledAt.toISOString(),
               durationMinutes: Number(form.duration_minutes),
+              classId: form.id,
             }).catch(() => toast.error('Aula salva, mas falhou ao sincronizar com o Zoom'))
           }
         } else if (form.create_zoom) {
@@ -342,14 +367,14 @@ export default function Calendar() {
       toast.success('Status atualizado')
       loadClasses()
       if (status === 'canceled' && c.zoom_meeting_id) {
-        deleteZoomMeeting(c.zoom_meeting_id).catch(() => {})
+        deleteZoomMeeting(c.zoom_meeting_id, c.id).catch(() => {})
       }
     }
   }
 
   async function handleDelete(c) {
     if (!confirm('Excluir esta aula?')) return
-    if (c.zoom_meeting_id) await deleteZoomMeeting(c.zoom_meeting_id).catch(() => {})
+    if (c.zoom_meeting_id) await deleteZoomMeeting(c.zoom_meeting_id, c.id).catch(() => {})
     const { error } = await supabase.from('classes').delete().eq('id', c.id)
     if (error) toast.error('Erro ao excluir aula')
     else {
@@ -361,7 +386,7 @@ export default function Calendar() {
   async function handleSync(c) {
     setSyncingId(c.id)
     try {
-      await syncZoomMeeting(c.zoom_meeting_id)
+      await syncZoomMeeting(c.zoom_meeting_id, c.id)
       toast.success('Sincronizado com o Zoom')
       loadClasses()
     } catch (err) {
@@ -397,7 +422,7 @@ export default function Calendar() {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleImportAll}
-                disabled={importingAll || !importable.some((m) => importPicks[m.id])}
+                disabled={importingAll || !importable.some((m) => importPicks[meetingKey(m)])}
                 className="rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
               >
                 {importingAll ? 'Importando…' : 'Importar todas'}
@@ -417,7 +442,7 @@ export default function Calendar() {
           </p>
           <div className="space-y-2">
             {importable.map((m) => (
-              <div key={m.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2.5">
+              <div key={meetingKey(m)} className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-900">{m.topic}</p>
                   <p className="text-xs text-slate-400">
@@ -425,8 +450,8 @@ export default function Calendar() {
                   </p>
                 </div>
                 <select
-                  value={importPicks[m.id] || ''}
-                  onChange={(e) => setImportPicks({ ...importPicks, [m.id]: e.target.value })}
+                  value={importPicks[meetingKey(m)] || ''}
+                  onChange={(e) => setImportPicks({ ...importPicks, [meetingKey(m)]: e.target.value })}
                   className="input w-40 text-sm"
                 >
                   <option value="">Aluno…</option>
@@ -436,7 +461,7 @@ export default function Calendar() {
                 </select>
                 <button
                   onClick={() => handleImport(m)}
-                  disabled={importingId === m.id}
+                  disabled={importingId === meetingKey(m)}
                   className="flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-60"
                 >
                   <Download className="h-3.5 w-3.5" /> Importar

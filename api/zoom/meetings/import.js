@@ -10,7 +10,7 @@ export default requireAuth(async function handler(req, res) {
     return
   }
 
-  const { meetingId, studentId } = req.body || {}
+  const { meetingId, studentId, startTime, durationMinutes, joinUrl } = req.body || {}
   if (!meetingId || !studentId) {
     res.status(400).json({ error: 'meetingId e studentId são obrigatórios' })
     return
@@ -29,9 +29,23 @@ export default requireAuth(async function handler(req, res) {
   }
 
   try {
-    const meeting = await getZoomMeeting(meetingId)
-    if (!meeting) {
-      res.status(404).json({ error: 'Reunião não encontrada no Zoom' })
+    // Reuniões recorrentes (ex.: aula fixa toda segunda) compartilham o mesmo
+    // ID no Zoom entre as ocorrências — a consulta direta a uma reunião
+    // (getZoomMeeting) só devolve o horário "base" da série, não da ocorrência
+    // específica escolhida na lista. Por isso priorizamos o horário que já
+    // veio da listagem (correto pra cada ocorrência) e só usamos o resultado
+    // do getZoomMeeting pra completar dados que faltarem.
+    const meeting = await getZoomMeeting(meetingId).catch(() => null)
+
+    const resolvedStartTime = startTime || meeting?.start_time
+    const resolvedDuration = durationMinutes || meeting?.duration
+    const resolvedJoinUrl = joinUrl || meeting?.join_url || null
+
+    if (!resolvedStartTime || !resolvedDuration) {
+      res.status(422).json({
+        error:
+          'Não conseguimos identificar o horário exato dessa reunião no Zoom (comum em reuniões recorrentes sem horário fixo). Tenta atualizar a lista e importar de novo, ou cadastre essa aula manualmente em "Nova aula".',
+      })
       return
     }
 
@@ -40,12 +54,12 @@ export default requireAuth(async function handler(req, res) {
       .insert({
         user_id: req.user.id,
         student_id: studentId,
-        scheduled_at: meeting.start_time,
-        duration_minutes: meeting.duration,
+        scheduled_at: resolvedStartTime,
+        duration_minutes: resolvedDuration,
         status: 'scheduled',
-        zoom_meeting_id: String(meeting.id),
-        zoom_join_url: meeting.join_url,
-        zoom_start_url: meeting.start_url,
+        zoom_meeting_id: String(meetingId),
+        zoom_join_url: resolvedJoinUrl,
+        zoom_start_url: meeting?.start_url || null,
         zoom_sync_status: 'synced',
         zoom_last_synced_at: new Date().toISOString(),
       })
