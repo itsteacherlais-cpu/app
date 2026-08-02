@@ -67,6 +67,10 @@ export default function Students() {
   function openEdit(student) {
     setForm({
       ...student,
+      whatsapp: student.whatsapp || '',
+      email: student.email || '',
+      objective: student.objective || '',
+      notes: student.notes || '',
       rate_value: String(student.rate_value ?? ''),
       package_classes_total: student.package_classes_total ? String(student.package_classes_total) : '',
       payment_due_day: String(student.payment_due_day ?? 10),
@@ -79,18 +83,18 @@ export default function Students() {
     setSaving(true)
     const payload = {
       user_id: user.id,
-      name: form.name.trim(),
-      whatsapp: form.whatsapp.trim() || null,
-      email: form.email.trim() || null,
+      name: (form.name || '').trim(),
+      whatsapp: (form.whatsapp || '').trim() || null,
+      email: (form.email || '').trim() || null,
       level: form.level,
-      objective: form.objective.trim() || null,
+      objective: (form.objective || '').trim() || null,
       rate_type: form.rate_type,
       rate_value: Number(form.rate_value) || 0,
       package_classes_total: form.rate_type === 'package' ? Number(form.package_classes_total) || null : null,
       payment_due_day: Number(form.payment_due_day) || 10,
       start_date: form.start_date,
       status: form.status,
-      notes: form.notes.trim() || null,
+      notes: (form.notes || '').trim() || null,
     }
 
     let error
