@@ -58,3 +58,28 @@ export async function syncZoomMeeting(meetingId) {
   }
   return resp.json()
 }
+
+export async function listImportableZoomMeetings() {
+  const resp = await fetch('/api/zoom/meetings/upcoming', {
+    method: 'GET',
+    headers: await authHeaders(),
+  })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}))
+    throw new Error(body.error || 'Erro ao buscar reuniões do Zoom')
+  }
+  return resp.json()
+}
+
+export async function importZoomMeeting({ meetingId, studentId }) {
+  const resp = await fetch('/api/zoom/meetings/import', {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ meetingId, studentId }),
+  })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}))
+    throw new Error(body.error || 'Erro ao importar reunião do Zoom')
+  }
+  return resp.json()
+}

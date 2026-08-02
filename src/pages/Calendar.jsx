@@ -9,10 +9,13 @@ import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import {
-  Plus, ChevronLeft, ChevronRight, Video, RefreshCw, Pencil, Trash2, Check, X as XIcon,
+  Plus, ChevronLeft, ChevronRight, Video, RefreshCw, Pencil, Trash2, Check, X as XIcon, Download,
 } from 'lucide-react'
 import { formatTime, formatCurrency, CLASS_STATUS } from '../lib/format'
-import { createZoomMeetingForClass, updateZoomMeeting, deleteZoomMeeting, syncZoomMeeting } from '../lib/zoomApi'
+import {
+  createZoomMeetingForClass, updateZoomMeeting, deleteZoomMeeting, syncZoomMeeting,
+  listImportableZoomMeetings, importZoomMeeting,
+} from '../lib/zoomApi'
 
 const EMPTY_FORM = {
   id: null,
@@ -39,6 +42,10 @@ export default function Calendar() {
   const [saving, setSaving] = useState(false)
   const [selectedDay, setSelectedDay] = useState(null)
   const [syncingId, setSyncingId] = useState(null)
+  const [importable, setImportable] = useState([])
+  const [loadingImportable, setLoadingImportable] = useState(false)
+  const [importPicks, setImportPicks] = useState({})
+  const [importingId, setImportingId] = useState(null)
 
   const range = useMemo(() => {
     if (view === 'week') {
@@ -52,6 +59,7 @@ export default function Calendar() {
 
   useEffect(() => {
     loadStudents()
+    loadImportable()
   }, [])
 
   useEffect(() => {
@@ -61,6 +69,37 @@ export default function Calendar() {
   async function loadStudents() {
     const { data } = await supabase.from('students').select('*').order('name')
     setStudents(data || [])
+  }
+
+  async function loadImportable() {
+    setLoadingImportable(true)
+    try {
+      const { meetings } = await listImportableZoomMeetings()
+      setImportable(meetings || [])
+    } catch (err) {
+      toast.error(err.message || 'Erro ao buscar reuniões do Zoom')
+    } finally {
+      setLoadingImportable(false)
+    }
+  }
+
+  async function handleImport(meeting) {
+    const studentId = importPicks[meeting.id]
+    if (!studentId) {
+      toast.error('Selecione o aluno dessa reunião')
+      return
+    }
+    setImportingId(meeting.id)
+    try {
+      await importZoomMeeting({ meetingId: meeting.id, studentId })
+      setImportable((prev) => prev.filter((m) => m.id !== meeting.id))
+      toast.success('Aula importada do Zoom')
+      loadClasses()
+    } catch (err) {
+      toast.error(err.message || 'Erro ao importar reunião')
+    } finally {
+      setImportingId(null)
+    }
   }
 
   async function loadClasses() {
@@ -252,6 +291,53 @@ export default function Calendar() {
           <Plus className="h-4 w-4" /> Nova aula
         </button>
       </div>
+
+      {importable.length > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-medium text-amber-900">
+              {importable.length} aula{importable.length > 1 ? 's' : ''} marcada{importable.length > 1 ? 's' : ''} no Zoom pra importar
+            </p>
+            <button
+              onClick={loadImportable}
+              disabled={loadingImportable}
+              className="rounded-lg p-1.5 text-amber-700 hover:bg-amber-100"
+              title="Atualizar lista"
+            >
+              <RefreshCw className={`h-4 w-4 ${loadingImportable ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <div className="space-y-2">
+            {importable.map((m) => (
+              <div key={m.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-900">{m.topic}</p>
+                  <p className="text-xs text-slate-400">
+                    {format(new Date(m.startTime), "d MMM 'às' HH:mm", { locale: ptBR })} · {m.durationMinutes} min
+                  </p>
+                </div>
+                <select
+                  value={importPicks[m.id] || ''}
+                  onChange={(e) => setImportPicks({ ...importPicks, [m.id]: e.target.value })}
+                  className="input w-40 text-sm"
+                >
+                  <option value="">Aluno…</option>
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleImport(m)}
+                  disabled={importingId === m.id}
+                  className="flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-60"
+                >
+                  <Download className="h-3.5 w-3.5" /> Importar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-1">

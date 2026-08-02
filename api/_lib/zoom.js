@@ -99,6 +99,19 @@ export async function deleteZoomMeeting(meetingId) {
   }
 }
 
+export async function listUpcomingZoomMeetings() {
+  const userId = process.env.ZOOM_USER_ID || 'me'
+  const resp = await zoomRequest(`/users/${userId}/meetings?type=upcoming&page_size=300`, {
+    method: 'GET',
+  })
+  if (!resp.ok) {
+    const text = await resp.text()
+    throw new Error(`Falha ao listar reuniões do Zoom: ${resp.status} ${text}`)
+  }
+  const data = await resp.json()
+  return data.meetings || []
+}
+
 export async function getZoomMeeting(meetingId) {
   const resp = await zoomRequest(`/meetings/${meetingId}`, { method: 'GET' })
   if (resp.status === 404) return null

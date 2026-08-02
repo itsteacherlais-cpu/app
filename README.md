@@ -21,6 +21,7 @@ Este projeto está sendo construído em fases. **Fases 1, 2, 3 e 4 concluídas �
 - **Controle de limite MEI** configurável (tela de Configurações), com soma automática do faturamento do ano, alertas por patamar (70/85/95%) e projeção de quando o teto seria atingido no ritmo atual
 - Módulo **Marketing & Infoproduto** (funil de leads/conversão, calendário de postagens em redes sociais, prospecção de parcerias/brand deals)
 - Módulo **Produção & Edição** (checklist técnico por vídeo com alerta de atraso)
+- **Importar aulas do Zoom**: se você agenda os horários por outro app (ex.: Calendly) que cria a reunião direto no Zoom, o Calendário mostra um aviso com as reuniões futuras do Zoom que ainda não têm aula vinculada — escolha o aluno de cada uma e clique em "Importar" pra criar a aula no app automaticamente com o link do Zoom já preenchido
 - **Contratos por aluno** (aulas contratadas, duração em meses) com aba própria em Alunos e alerta no Dashboard quando vence em até 30 dias
 - **Geração automática dos pagamentos do mês**: ao abrir Pagamentos, cria sozinho os lançamentos pendentes do mês pra cada aluno ativo (usando o dia de vencimento configurado em cada aluno), sem precisar cadastrar na mão
 - Módulo **Tarefas** (quadro A fazer/Fazendo/Feito, separado visualmente em manuais/administrativas x criativas, com prioridade e prazo)
