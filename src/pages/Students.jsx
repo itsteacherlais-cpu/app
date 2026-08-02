@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
-import { Plus, Search, MessageCircle, Mail, Pencil, Trash2, FileText } from 'lucide-react'
+import { Plus, Search, MessageCircle, Mail, Pencil, Trash2, FileText, Folder } from 'lucide-react'
 import { formatCurrency, formatDate, CEFR_LEVELS, STUDENT_STATUS } from '../lib/format'
 import { computeEndDate, getContractStatus, DURATION_PRESETS } from '../lib/contracts'
 
@@ -21,6 +21,7 @@ const EMPTY_FORM = {
   start_date: new Date().toISOString().slice(0, 10),
   status: 'active',
   notes: '',
+  folder_url: '',
 }
 
 const TABS = [
@@ -71,6 +72,7 @@ export default function Students() {
       email: student.email || '',
       objective: student.objective || '',
       notes: student.notes || '',
+      folder_url: student.folder_url || '',
       rate_value: String(student.rate_value ?? ''),
       package_classes_total: student.package_classes_total ? String(student.package_classes_total) : '',
       payment_due_day: String(student.payment_due_day ?? 10),
@@ -95,6 +97,7 @@ export default function Students() {
       start_date: form.start_date,
       status: form.status,
       notes: (form.notes || '').trim() || null,
+      folder_url: (form.folder_url || '').trim() || null,
     }
 
     let error
@@ -199,6 +202,17 @@ export default function Students() {
                         <span className="flex items-center gap-1">
                           <Mail className="h-3.5 w-3.5" /> {s.email}
                         </span>
+                      )}
+                      {s.folder_url && (
+                        <a
+                          href={s.folder_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 text-indigo-600 hover:underline"
+                        >
+                          <Folder className="h-3.5 w-3.5" /> Pasta
+                        </a>
                       )}
                       <span>
                         {formatCurrency(s.rate_value)} / {s.rate_type === 'package' ? `pacote (${s.package_classes_total ?? '-'} aulas)` : 'aula'} · vence dia {s.payment_due_day}
@@ -355,6 +369,16 @@ export default function Students() {
               />
             </Field>
           </div>
+
+          <Field label="Link da pasta do aluno">
+            <input
+              type="url"
+              value={form.folder_url}
+              onChange={(e) => setForm({ ...form, folder_url: e.target.value })}
+              className="input"
+              placeholder="https://drive.google.com/…"
+            />
+          </Field>
 
           <Field label="Notas">
             <textarea

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { syncStudyPlanTasks } from '../lib/studyPlanTasks'
 import Modal from './Modal'
 import {
   LayoutDashboard,
@@ -40,11 +41,15 @@ const SECONDARY_ITEMS = [
 ]
 
 export default function Layout() {
-  const { signOut } = useAuth()
+  const { signOut, user } = useAuth()
   const location = useLocation()
   const [showMore, setShowMore] = useState(false)
 
   const isSecondaryActive = SECONDARY_ITEMS.some((item) => location.pathname === item.to)
+
+  useEffect(() => {
+    if (user) syncStudyPlanTasks(user.id)
+  }, [user])
 
   return (
     <div className="flex h-screen flex-col bg-slate-50 md:flex-row">
