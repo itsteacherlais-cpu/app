@@ -17,6 +17,55 @@ import {
   listImportableZoomMeetings, importZoomMeeting,
 } from '../lib/zoomApi'
 
+const DISMISSED_ZOOM_KEY = 'teacherlais_dismissed_zoom_meetings'
+
+function normalizeName(s) {
+  return (s || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// Tenta adivinhar o aluno pelo nome que aparece no título da reunião do Zoom.
+// Só assume o palpite quando é o único aluno compatível, pra não errar entre
+// alunos com nomes parecidos.
+function guessStudentForTopic(topic, students) {
+  const normTopic = normalizeName(topic)
+  if (!normTopic) return null
+
+  const fullNameMatches = students.filter((s) => {
+    const n = normalizeName(s.name)
+    return n && normTopic.includes(n)
+  })
+  if (fullNameMatches.length === 1) return fullNameMatches[0]
+
+  const topicWords = new Set(normTopic.split(' ').filter(Boolean))
+  const firstNameMatches = students.filter((s) => {
+    const first = normalizeName(s.name).split(' ')[0]
+    return first && first.length > 2 && topicWords.has(first)
+  })
+  if (firstNameMatches.length === 1) return firstNameMatches[0]
+
+  return null
+}
+
+function getDismissedZoomIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(DISMISSED_ZOOM_KEY) || '[]'))
+  } catch {
+    return new Set()
+  }
+}
+
+function addDismissedZoomId(id) {
+  const current = getDismissedZoomIds()
+  current.add(String(id))
+  localStorage.setItem(DISMISSED_ZOOM_KEY, JSON.stringify([...current]))
+}
+
 const EMPTY_FORM = {
   id: null,
   student_id: '',
@@ -75,12 +124,34 @@ export default function Calendar() {
     setLoadingImportable(true)
     try {
       const { meetings } = await listImportableZoomMeetings()
-      setImportable(meetings || [])
+      const dismissed = getDismissedZoomIds()
+      setImportable((meetings || []).filter((m) => !dismissed.has(String(m.id))))
     } catch (err) {
       toast.error(err.message || 'Erro ao buscar reuniões do Zoom')
     } finally {
       setLoadingImportable(false)
     }
+  }
+
+  useEffect(() => {
+    if (!importable.length || !students.length) return
+    setImportPicks((prev) => {
+      const next = { ...prev }
+      let changed = false
+      for (const m of importable) {
+        if (next[m.id] === undefined) {
+          const guess = guessStudentForTopic(m.topic, students)
+          next[m.id] = guess ? guess.id : ''
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [importable, students])
+
+  function handleDismiss(meeting) {
+    addDismissedZoomId(meeting.id)
+    setImportable((prev) => prev.filter((m) => m.id !== meeting.id))
   }
 
   async function handleImport(meeting) {
@@ -307,6 +378,9 @@ export default function Calendar() {
               <RefreshCw className={`h-4 w-4 ${loadingImportable ? 'animate-spin' : ''}`} />
             </button>
           </div>
+          <p className="mb-2 text-xs text-amber-700">
+            Já tentamos adivinhar o aluno pelo nome da reunião — confira antes de importar. Se não for aula de aluno (ex.: reunião de teste), clique em "Ignorar".
+          </p>
           <div className="space-y-2">
             {importable.map((m) => (
               <div key={m.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2.5">
@@ -332,6 +406,13 @@ export default function Calendar() {
                   className="flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-60"
                 >
                   <Download className="h-3.5 w-3.5" /> Importar
+                </button>
+                <button
+                  onClick={() => handleDismiss(m)}
+                  className="rounded-lg px-2 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  title="Não é aula de aluno, ignorar essa reunião"
+                >
+                  Ignorar
                 </button>
               </div>
             ))}
