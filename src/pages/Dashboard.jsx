@@ -479,7 +479,7 @@ function SuggestionsCard() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-slate-400">Buscando temas em alta e gerando ideias…</p>
+        <p className="text-sm text-slate-400">Buscando fofocas em alta e gerando ideias…</p>
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : !items || items.length === 0 ? (
@@ -509,7 +509,7 @@ function SuggestionsCard() {
         </div>
       )}
       <p className="mt-3 text-[11px] text-slate-400">
-        Temas em alta no Google Trends Brasil + ideia de conteúdo pra conectar com inglês. Atualiza sozinho uma vez por dia.
+        Fofocas de famosas/filmes/séries/música em alta em sites dos EUA e Europa + ideia de conteúdo pra ensinar inglês com o assunto. Atualiza sozinho uma vez por dia.
       </p>
     </section>
   )

@@ -1,6 +1,6 @@
 import { requireAuth } from '../_lib/auth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
-import { getTrendingTopicsBR } from '../_lib/trends.js'
+import { getCelebGossipHeadlines } from '../_lib/gossip.js'
 import { pickRandomIdea } from '../_lib/ideaTemplates.js'
 
 // Data é decidida pelo cliente (fuso local dela), não pelo servidor — evita
@@ -37,11 +37,12 @@ export default requireAuth(async function handler(req, res) {
   }
 
   try {
-    // 100% gratuito: temas reais do Google Trends (feed público, sem chave)
-    // + ideias geradas por modelos de frase locais (sem chamada a nenhuma IA paga).
-    const topics = await getTrendingTopicsBR(10)
+    // 100% gratuito: manchetes de fofoca/entretenimento de sites dos EUA e
+    // Europa (feeds RSS públicos, sem chave) + ideias geradas por modelos de
+    // frase locais (sem chamada a nenhuma IA paga).
+    const topics = await getCelebGossipHeadlines(3)
     if (topics.length === 0) {
-      throw new Error('Nenhum tema em alta encontrado agora, tenta de novo mais tarde')
+      throw new Error('Nenhuma fofoca encontrada agora, tenta de novo mais tarde')
     }
 
     const items = topics.map((topic) => ({ topic, idea: pickRandomIdea(topic) }))

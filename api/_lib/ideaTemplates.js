@@ -18,6 +18,9 @@ export const IDEA_TEMPLATES = [
   'Monte um roteiro de "read the news in English": resuma em 1 parágrafo simples, em inglês, o assunto "{topic}".',
   'Ensine como dar opinião em inglês usando "{topic}" como exemplo (structures: "In my opinion...", "I believe that...").',
   'Crie conteúdo sobre conectores/linking words usando frases sobre "{topic}" como exemplo prático.',
+  'Reaja em inglês à fofoca "{topic}", ensinando expressões de reação (ex.: "I can\'t believe...", "No way!", "I was shocked when...").',
+  'Conte "{topic}" em inglês como se fosse fofoca pra uma amiga, ensinando gírias de gossip (ex.: "spill the tea", "I heard that...", "rumor has it...").',
+  'Traduza e explique 3 palavras/expressões específicas usadas nas manchetes internacionais sobre "{topic}".',
 ]
 
 export function pickRandomIdea(topic) {
