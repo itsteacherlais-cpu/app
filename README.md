@@ -17,7 +17,8 @@ Este projeto está sendo construído em fases. **Fases 1, 2, 3 e 4 concluídas �
 - Módulo **Conteúdo** (quadro Kanban Ideia → Roteiro → Gravação → Edição → Publicado)
 - **Metas semanais/mensais** de conteúdo com barra de progresso e metas escalonadas (sugere aumentar a meta após 3 ciclos seguidos batidos)
 - **Relatórios periódicos** (o que foi produzido, o que faltou, próximos passos) gerados ao "fechar o ciclo" de uma meta
-- Módulo **Financeiro** (lançamentos de receita/despesa, resumo do mês, gráfico de evolução dos últimos 6 meses)
+- Módulo **Financeiro** (lançamentos de receita/despesa, resumo do mês, gráfico de evolução do ano corrente, resultado do ano com lucro/margem e principais categorias)
+- **Importar extrato bancário (PDF do Cora)**: botão "Importar extrato" em Financeiro lê o PDF inteiramente no navegador (sem enviar pra nenhuma IA/servidor externo) e reconhece os lançamentos (data, descrição, valor, entrada/saída). Mostra uma tela de conferência editável — dá pra corrigir, remover ou desmarcar qualquer linha — antes de confirmar a importação pro Financeiro
 - **Controle de limite MEI** configurável (tela de Configurações), com soma automática do faturamento do ano, alertas por patamar (70/85/95%) e projeção de quando o teto seria atingido no ritmo atual
 - Módulo **Marketing & Infoproduto** (funil de leads/conversão, calendário de postagens em redes sociais, prospecção de parcerias/brand deals)
 - Módulo **Produção & Edição** (checklist técnico por vídeo com alerta de atraso)

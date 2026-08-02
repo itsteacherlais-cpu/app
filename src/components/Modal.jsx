@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 
-export default function Modal({ open, onClose, title, children, footer }) {
+export default function Modal({ open, onClose, title, children, footer, wide = false }) {
   if (!open) return null
 
   return (
@@ -10,7 +10,11 @@ export default function Modal({ open, onClose, title, children, footer }) {
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative flex max-h-[90vh] w-full flex-col rounded-t-2xl bg-white shadow-xl md:max-w-lg md:rounded-2xl">
+      <div
+        className={`relative flex max-h-[90vh] w-full flex-col rounded-t-2xl bg-white shadow-xl md:rounded-2xl ${
+          wide ? 'md:max-w-3xl' : 'md:max-w-lg'
+        }`}
+      >
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           <button

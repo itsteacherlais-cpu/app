@@ -28,3 +28,16 @@ export function getLastMonths(n, date = new Date()) {
   }
   return months
 }
+
+// Todos os meses de janeiro até o mês atual do ano corrente — usado no
+// relatório financeiro pra sempre mostrar o ano todo (inclusive meses
+// antigos importados de extrato), em vez de uma janela fixa de N meses que
+// poderia cortar fora janeiro-julho se hoje já for agosto, por exemplo.
+export function getMonthsInCurrentYear(date = new Date()) {
+  const months = []
+  for (let m = 0; m <= date.getMonth(); m++) {
+    const d = new Date(date.getFullYear(), m, 1)
+    months.push({ key: monthKey(d), label: monthLabel(d), start: startOfMonth(d), end: endOfMonth(d) })
+  }
+  return months
+}

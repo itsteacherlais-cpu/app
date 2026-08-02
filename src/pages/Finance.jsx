@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
-import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, AlertTriangle, Settings as SettingsIcon } from 'lucide-react'
+import {
+  Plus, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, AlertTriangle, Settings as SettingsIcon,
+  Upload, Check, X as XIcon,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { formatCurrency, formatDate } from '../lib/format'
-import { getYearRange, getLastMonths } from '../lib/finance'
+import { getYearRange, getMonthsInCurrentYear } from '../lib/finance'
 import { startOfMonth, endOfMonth, format, differenceInCalendarMonths } from 'date-fns'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts'
+import { extractCoraStatement } from '../lib/statementImport'
 
 const EMPTY_FORM = {
   id: null,
@@ -25,7 +29,6 @@ export default function Finance() {
   const { user } = useAuth()
   const [tab, setTab] = useState('visao')
   const [yearTransactions, setYearTransactions] = useState([])
-  const [chartTransactions, setChartTransactions] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [monthFilter, setMonthFilter] = useState(format(new Date(), 'yyyy-MM'))
@@ -33,6 +36,10 @@ export default function Finance() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [categoryOptions, setCategoryOptions] = useState([])
+  const [importingFile, setImportingFile] = useState(false)
+  const [importRows, setImportRows] = useState(null)
+  const [savingImport, setSavingImport] = useState(false)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     loadAll()
@@ -41,24 +48,18 @@ export default function Finance() {
   async function loadAll() {
     setLoading(true)
     const yearRange = getYearRange()
-    const months = getLastMonths(6)
 
-    const [{ data: yearData, error: yearErr }, { data: chartData }, { data: settingsData }] = await Promise.all([
+    const [{ data: yearData, error: yearErr }, { data: settingsData }] = await Promise.all([
       supabase
         .from('transactions')
         .select('*')
         .gte('occurred_on', format(yearRange.start, 'yyyy-MM-dd'))
         .lte('occurred_on', format(yearRange.end, 'yyyy-MM-dd')),
-      supabase
-        .from('transactions')
-        .select('*')
-        .gte('occurred_on', format(months[0].start, 'yyyy-MM-dd')),
       supabase.from('settings').select('*').maybeSingle(),
     ])
 
     if (yearErr) toast.error('Erro ao carregar financeiro')
     setYearTransactions(yearData || [])
-    setChartTransactions(chartData || [])
     setSettings(settingsData)
     setCategoryOptions([...new Set((yearData || []).map((t) => t.category))].sort())
     setLoading(false)
@@ -110,6 +111,67 @@ export default function Finance() {
     }
   }
 
+  async function handleFileSelected(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setImportingFile(true)
+    try {
+      const parsed = await extractCoraStatement(file)
+      if (parsed.length === 0) {
+        toast.error('Não consegui reconhecer nenhum lançamento nesse PDF. Confere se é um extrato do Cora.')
+        return
+      }
+      setImportRows(
+        parsed.map((t, idx) => ({
+          tempId: idx,
+          include: true,
+          date: t.date || format(new Date(), 'yyyy-MM-dd'),
+          description: t.description,
+          type: t.type,
+          category: t.type === 'income' ? 'outros' : 'outros',
+          amount: String(t.amount),
+        }))
+      )
+      toast.success(`${parsed.length} lançamento(s) encontrado(s) — confira antes de importar.`)
+    } catch (err) {
+      toast.error('Erro ao ler o PDF do extrato')
+    } finally {
+      setImportingFile(false)
+    }
+  }
+
+  function updateImportRow(tempId, patch) {
+    setImportRows((prev) => prev.map((r) => (r.tempId === tempId ? { ...r, ...patch } : r)))
+  }
+
+  async function handleConfirmImport() {
+    const toImport = importRows.filter((r) => r.include)
+    if (toImport.length === 0) {
+      toast.error('Selecione ao menos um lançamento')
+      return
+    }
+    setSavingImport(true)
+    const payload = toImport.map((r) => ({
+      user_id: user.id,
+      type: r.type,
+      category: (r.category || 'outros').trim() || 'outros',
+      amount: Number(r.amount) || 0,
+      description: r.description || null,
+      occurred_on: r.date,
+    }))
+    const { error } = await supabase.from('transactions').insert(payload)
+    if (error) {
+      toast.error('Erro ao importar lançamentos')
+    } else {
+      toast.success(`${toImport.length} lançamento(s) importado(s)`)
+      setImportRows(null)
+      loadAll()
+    }
+    setSavingImport(false)
+  }
+
   // Comparações por string ("yyyy-MM-dd" / "yyyy-MM"), não por Date: occurred_on
   // é uma coluna "date" pura do Postgres, então comparar como texto evita
   // qualquer problema de fuso horário na conversão pra Date.
@@ -126,19 +188,39 @@ export default function Finance() {
   const monthBalance = monthIncome - monthExpense
 
   const yearIncomeTotal = yearTransactions.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
+  const yearExpenseTotal = yearTransactions.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
+  const yearProfit = yearIncomeTotal - yearExpenseTotal
+  const yearMargin = yearIncomeTotal > 0 ? Math.round((yearProfit / yearIncomeTotal) * 100) : 0
 
+  // Mostra o ano inteiro até o mês atual (não só uma janela fixa de meses),
+  // pra dar pra ver janeiro-julho quando ela importar extratos antigos.
   const chartData = useMemo(() => {
-    const months = getLastMonths(6)
+    const months = getMonthsInCurrentYear()
     return months.map((m) => {
-      const income = chartTransactions
+      const income = yearTransactions
         .filter((t) => t.type === 'income' && t.occurred_on.slice(0, 7) === m.key)
         .reduce((s, t) => s + Number(t.amount), 0)
-      const expense = chartTransactions
+      const expense = yearTransactions
         .filter((t) => t.type === 'expense' && t.occurred_on.slice(0, 7) === m.key)
         .reduce((s, t) => s + Number(t.amount), 0)
       return { mes: m.label, Receita: income, Despesa: expense }
     })
-  }, [chartTransactions])
+  }, [yearTransactions])
+
+  const categoryBreakdown = useMemo(() => {
+    const totals = {}
+    for (const t of yearTransactions) {
+      const key = `${t.type}:${t.category}`
+      totals[key] = (totals[key] || 0) + Number(t.amount)
+    }
+    return Object.entries(totals)
+      .map(([key, amount]) => {
+        const [type, category] = key.split(':')
+        return { type, category, amount }
+      })
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 8)
+  }, [yearTransactions])
 
   const filteredList = useMemo(
     () => yearTransactions.filter((t) => t.occurred_on.slice(0, 7) === monthFilter).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on)),
@@ -147,14 +229,36 @@ export default function Finance() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
+      <datalist id="category-options">
+        {categoryOptions.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-900">Financeiro</h1>
-        <button
-          onClick={openNew}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4" /> Lançar
-        </button>
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            onChange={handleFileSelected}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importingFile}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+          >
+            <Upload className="h-4 w-4" /> {importingFile ? 'Lendo extrato…' : 'Importar extrato'}
+          </button>
+          <button
+            onClick={openNew}
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4" /> Lançar
+          </button>
+        </div>
       </div>
 
       <div className="mb-5 flex gap-1.5">
@@ -185,7 +289,7 @@ export default function Finance() {
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-800">Evolução (últimos 6 meses)</h3>
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">Evolução ({new Date().getFullYear()})</h3>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
@@ -204,6 +308,39 @@ export default function Finance() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">Resultado do ano</h3>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-[11px] font-medium text-slate-400">Receita</p>
+                <p className="text-sm font-semibold text-emerald-600">{formatCurrency(yearIncomeTotal)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-400">Despesa</p>
+                <p className="text-sm font-semibold text-red-600">{formatCurrency(yearExpenseTotal)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-400">Lucro ({yearMargin}%)</p>
+                <p className={`text-sm font-semibold ${yearProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {formatCurrency(yearProfit)}
+                </p>
+              </div>
+            </div>
+            {categoryBreakdown.length > 0 && (
+              <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3">
+                <p className="mb-2 text-[11px] font-medium text-slate-400">Principais categorias no ano</p>
+                {categoryBreakdown.map((c) => (
+                  <div key={`${c.type}:${c.category}`} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600">{c.category}</span>
+                    <span className={c.type === 'income' ? 'font-medium text-emerald-600' : 'font-medium text-red-600'}>
+                      {c.type === 'income' ? '+' : '-'}{formatCurrency(c.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {settings && <MeiCard settings={settings} yearIncomeTotal={yearIncomeTotal} />}
@@ -288,11 +425,6 @@ export default function Finance() {
               className="input"
               placeholder="Aulas, Infoproduto, Equipamento…"
             />
-            <datalist id="category-options">
-              {categoryOptions.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Valor">
@@ -332,6 +464,97 @@ export default function Finance() {
             className="flex-1 rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
           >
             {saving ? 'Salvando…' : 'Salvar'}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!importRows}
+        onClose={() => setImportRows(null)}
+        title="Conferir lançamentos do extrato"
+        wide
+      >
+        {importRows && (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Confira data, tipo, categoria, descrição e valor de cada lançamento antes de importar. Desmarque o que não quiser trazer.
+            </p>
+            <div className="space-y-2">
+              {importRows.map((r) => (
+                <div
+                  key={r.tempId}
+                  className={`rounded-lg border p-2.5 ${r.include ? 'border-slate-200 bg-white' : 'border-slate-100 bg-slate-50 opacity-60'}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateImportRow(r.tempId, { include: !r.include })}
+                      className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                        r.include ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'
+                      }`}
+                    >
+                      {r.include ? <Check className="h-3.5 w-3.5" /> : null}
+                    </button>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <input
+                        value={r.description}
+                        onChange={(e) => updateImportRow(r.tempId, { description: e.target.value })}
+                        className="input text-sm"
+                        placeholder="Descrição"
+                      />
+                      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                        <input
+                          type="date"
+                          value={r.date}
+                          onChange={(e) => updateImportRow(r.tempId, { date: e.target.value })}
+                          className="input text-sm"
+                        />
+                        <select
+                          value={r.type}
+                          onChange={(e) => updateImportRow(r.tempId, { type: e.target.value })}
+                          className="input text-sm"
+                        >
+                          <option value="income">Receita</option>
+                          <option value="expense">Despesa</option>
+                        </select>
+                        <input
+                          list="category-options"
+                          value={r.category}
+                          onChange={(e) => updateImportRow(r.tempId, { category: e.target.value })}
+                          className="input text-sm"
+                          placeholder="Categoria"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={r.amount}
+                          onChange={(e) => updateImportRow(r.tempId, { amount: e.target.value })}
+                          className="input text-sm"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setImportRows((prev) => prev.filter((row) => row.tempId !== r.tempId))}
+                      className="mt-1 shrink-0 rounded-lg p-1 text-slate-300 hover:bg-red-50 hover:text-red-500"
+                      title="Remover da lista"
+                    >
+                      <XIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="mt-3 flex gap-2 pt-2">
+          <button
+            onClick={handleConfirmImport}
+            disabled={savingImport}
+            className="flex-1 rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {savingImport ? 'Importando…' : `Importar ${importRows?.filter((r) => r.include).length || 0} lançamento(s)`}
           </button>
         </div>
       </Modal>
