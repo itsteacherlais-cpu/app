@@ -1,17 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
-import { Plus, Search, MessageCircle, Mail, Pencil, Trash2, FileText, Folder } from 'lucide-react'
+import { Plus, Search, MessageCircle, Mail, Pencil, Trash2, FileText, Folder, Upload } from 'lucide-react'
 import { formatCurrency, formatDate, CEFR_LEVELS, STUDENT_STATUS } from '../lib/format'
 import { computeEndDate, getContractStatus, DURATION_PRESETS } from '../lib/contracts'
+import { extractTextFromPdf, parseContractText } from '../lib/contractImport'
 
 const EMPTY_FORM = {
   id: null,
   name: '',
   whatsapp: '',
   email: '',
+  address: '',
+  cep: '',
+  cpf: '',
+  rg: '',
+  birth_date: '',
   level: 'A1',
   objective: '',
   rate_type: 'per_class',
@@ -38,6 +44,9 @@ export default function Students() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [importingContract, setImportingContract] = useState(false)
+  const pendingContractRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   async function loadStudents() {
     setLoading(true)
@@ -61,15 +70,22 @@ export default function Students() {
   }, [students, search])
 
   function openNew() {
+    pendingContractRef.current = null
     setForm(EMPTY_FORM)
     setShowModal(true)
   }
 
   function openEdit(student) {
+    pendingContractRef.current = null
     setForm({
       ...student,
       whatsapp: student.whatsapp || '',
       email: student.email || '',
+      address: student.address || '',
+      cep: student.cep || '',
+      cpf: student.cpf || '',
+      rg: student.rg || '',
+      birth_date: student.birth_date || '',
       objective: student.objective || '',
       notes: student.notes || '',
       folder_url: student.folder_url || '',
@@ -88,6 +104,11 @@ export default function Students() {
       name: (form.name || '').trim(),
       whatsapp: (form.whatsapp || '').trim() || null,
       email: (form.email || '').trim() || null,
+      address: (form.address || '').trim() || null,
+      cep: (form.cep || '').trim() || null,
+      cpf: (form.cpf || '').trim() || null,
+      rg: (form.rg || '').trim() || null,
+      birth_date: form.birth_date || null,
       level: form.level,
       objective: (form.objective || '').trim() || null,
       rate_type: form.rate_type,
@@ -101,20 +122,82 @@ export default function Students() {
     }
 
     let error
+    let newStudentId = form.id
     if (form.id) {
       ;({ error } = await supabase.from('students').update(payload).eq('id', form.id))
     } else {
-      ;({ error } = await supabase.from('students').insert(payload))
+      const { data, error: insertError } = await supabase.from('students').insert(payload).select('id').single()
+      error = insertError
+      newStudentId = data?.id
     }
 
     if (error) {
       toast.error('Erro ao salvar aluno')
-    } else {
-      toast.success(form.id ? 'Aluno atualizado' : 'Aluno cadastrado')
-      setShowModal(false)
-      loadStudents()
+      setSaving(false)
+      return
     }
+
+    // Se o aluno veio de um contrato importado, cria também o registro em
+    // Contratos com os dados extraídos (duração, aulas contratadas, vigência).
+    if (!form.id && pendingContractRef.current && newStudentId) {
+      const c = pendingContractRef.current
+      const { error: contractError } = await supabase.from('contracts').insert({
+        user_id: user.id,
+        student_id: newStudentId,
+        classes_contracted: c.package_classes_total || null,
+        duration_months: c.duration_months || 6,
+        start_date: c.contract_start_date || form.start_date,
+        end_date: c.contract_end_date || computeEndDate(c.contract_start_date || form.start_date, c.duration_months || 6),
+      })
+      if (contractError) toast.error('Aluno criado, mas houve erro ao salvar o contrato em Contratos')
+      pendingContractRef.current = null
+    }
+
+    toast.success(form.id ? 'Aluno atualizado' : 'Aluno cadastrado')
+    setShowModal(false)
+    loadStudents()
     setSaving(false)
+  }
+
+  async function handleImportContract(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setImportingContract(true)
+    try {
+      const text = await extractTextFromPdf(file)
+      const parsed = parseContractText(text)
+
+      if (!parsed.name) {
+        toast.error('Não consegui reconhecer os dados desse PDF. Confere se é um contrato no modelo padrão.')
+        return
+      }
+
+      pendingContractRef.current = parsed
+      setForm({
+        ...EMPTY_FORM,
+        name: parsed.name,
+        whatsapp: parsed.whatsapp,
+        email: parsed.email,
+        address: parsed.address,
+        cep: parsed.cep,
+        cpf: parsed.cpf,
+        rg: parsed.rg,
+        birth_date: parsed.birth_date,
+        rate_type: parsed.package_classes_total ? 'package' : 'per_class',
+        rate_value: parsed.rate_value != null ? String(parsed.rate_value) : '',
+        package_classes_total: parsed.package_classes_total ? String(parsed.package_classes_total) : '',
+        payment_due_day: parsed.payment_due_day ? String(parsed.payment_due_day) : '10',
+        start_date: parsed.contract_start_date || EMPTY_FORM.start_date,
+      })
+      setShowModal(true)
+      toast.success('Dados extraídos do contrato — confira antes de salvar (nível, objetivo e notas ficam pra você preencher).')
+    } catch (err) {
+      toast.error('Erro ao ler o PDF do contrato')
+    } finally {
+      setImportingContract(false)
+    }
   }
 
   async function handleDelete(id) {
@@ -132,12 +215,28 @@ export default function Students() {
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-900">Alunos</h1>
         {tab === 'alunos' && (
-          <button
-            onClick={openNew}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            <Plus className="h-4 w-4" /> Novo aluno
-          </button>
+          <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handleImportContract}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importingContract}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <Upload className="h-4 w-4" /> {importingContract ? 'Lendo contrato…' : 'Importar contrato'}
+            </button>
+            <button
+              onClick={openNew}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              <Plus className="h-4 w-4" /> Novo aluno
+            </button>
+          </div>
         )}
       </div>
 
@@ -276,6 +375,47 @@ export default function Students() {
               />
             </Field>
           </div>
+
+          <Field label="Endereço">
+            <input
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              className="input"
+            />
+          </Field>
+
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="CEP">
+              <input
+                value={form.cep}
+                onChange={(e) => setForm({ ...form, cep: e.target.value })}
+                className="input"
+              />
+            </Field>
+            <Field label="CPF">
+              <input
+                value={form.cpf}
+                onChange={(e) => setForm({ ...form, cpf: e.target.value })}
+                className="input"
+              />
+            </Field>
+            <Field label="RG">
+              <input
+                value={form.rg}
+                onChange={(e) => setForm({ ...form, rg: e.target.value })}
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <Field label="Data de nascimento">
+            <input
+              type="date"
+              value={form.birth_date}
+              onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
+              className="input"
+            />
+          </Field>
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Nível">
