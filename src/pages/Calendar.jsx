@@ -95,6 +95,7 @@ export default function Calendar() {
   const [loadingImportable, setLoadingImportable] = useState(false)
   const [importPicks, setImportPicks] = useState({})
   const [importingId, setImportingId] = useState(null)
+  const [importingAll, setImportingAll] = useState(false)
 
   const range = useMemo(() => {
     if (view === 'week') {
@@ -171,6 +172,30 @@ export default function Calendar() {
     } finally {
       setImportingId(null)
     }
+  }
+
+  async function handleImportAll() {
+    const toImport = importable.filter((m) => importPicks[m.id])
+    if (toImport.length === 0) {
+      toast.error('Nenhuma reunião com aluno selecionado ainda')
+      return
+    }
+    setImportingAll(true)
+    let successCount = 0
+    for (const m of toImport) {
+      try {
+        await importZoomMeeting({ meetingId: m.id, studentId: importPicks[m.id] })
+        successCount++
+        setImportable((prev) => prev.filter((x) => x.id !== m.id))
+      } catch (err) {
+        toast.error(`Falha ao importar "${m.topic}": ${err.message || 'erro'}`)
+      }
+    }
+    if (successCount > 0) {
+      toast.success(`${successCount} aula(s) importada(s) do Zoom`)
+      loadClasses()
+    }
+    setImportingAll(false)
   }
 
   async function loadClasses() {
@@ -369,17 +394,26 @@ export default function Calendar() {
             <p className="text-sm font-medium text-amber-900">
               {importable.length} aula{importable.length > 1 ? 's' : ''} marcada{importable.length > 1 ? 's' : ''} no Zoom pra importar
             </p>
-            <button
-              onClick={loadImportable}
-              disabled={loadingImportable}
-              className="rounded-lg p-1.5 text-amber-700 hover:bg-amber-100"
-              title="Atualizar lista"
-            >
-              <RefreshCw className={`h-4 w-4 ${loadingImportable ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleImportAll}
+                disabled={importingAll || !importable.some((m) => importPicks[m.id])}
+                className="rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {importingAll ? 'Importando…' : 'Importar todas'}
+              </button>
+              <button
+                onClick={loadImportable}
+                disabled={loadingImportable}
+                className="rounded-lg p-1.5 text-amber-700 hover:bg-amber-100"
+                title="Atualizar lista"
+              >
+                <RefreshCw className={`h-4 w-4 ${loadingImportable ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
           <p className="mb-2 text-xs text-amber-700">
-            Já tentamos adivinhar o aluno pelo nome da reunião — confira antes de importar. Se não for aula de aluno (ex.: reunião de teste), clique em "Ignorar".
+            Já tentamos adivinhar o aluno pelo nome da reunião. Confira se está tudo certo e clique em <strong>"Importar todas"</strong> pra trazer todas de uma vez, ou ajuste/importe uma por uma. Se não for aula de aluno (ex.: reunião de teste), clique em "Ignorar".
           </p>
           <div className="space-y-2">
             {importable.map((m) => (
