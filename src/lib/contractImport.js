@@ -20,10 +20,14 @@ function escapeRegex(s) {
 }
 
 // Pega o texto entre "LABEL -" e o próximo "LABEL -" conhecido, no modelo de
-// contrato "LABEL - valor" da Teacher Laís (linha reta, sem quebra).
+// contrato "LABEL - valor" da Teacher Laís (linha reta, sem quebra). O Word
+// às vezes autocorrige o hífen pra travessão/meia-risca ("–"/"—") de forma
+// inconsistente dentro do mesmo documento, então aceita qualquer um dos três.
+const DASH = '[-–—]'
+
 function between(flatText, startLabel, endLabel) {
   const re = new RegExp(
-    `${escapeRegex(startLabel)}\\s*-\\s*(.*?)\\s*${escapeRegex(endLabel)}\\s*-`,
+    `${escapeRegex(startLabel)}\\s*${DASH}\\s*(.*?)\\s*${escapeRegex(endLabel)}\\s*${DASH}`,
     'i'
   )
   const m = flatText.match(re)
@@ -57,7 +61,7 @@ export function parseContractText(rawText) {
   const birthDateBr = between(flat, 'DATA DE NASCIMENTO', 'EMAIL')
   const birth_date = toISODate(birthDateBr)
 
-  const emailMatch = flat.match(/EMAIL\s*-\s*([^\s]+@[^\s.,;]+\.[^\s.,;]+)/i)
+  const emailMatch = flat.match(/EMAIL\s*[-–—]\s*([^\s]+@[^\s.,;]+\.[^\s.,;]+)/i)
   const email = emailMatch ? emailMatch[1] : ''
 
   const classesMatch = flat.match(/(\d+)\s*encontros/i)
